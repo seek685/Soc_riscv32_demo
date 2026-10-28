@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>滑动窗口 = 缓存：行缓存如何让每个像素只读一次</title>
+<style>
+  body { margin:0; background:#f4f5f7; font-family:"Microsoft YaHei",sans-serif; }
+  #wrap { width:1260px; margin:16px auto; }
+  canvas { background:#ffffff; border:1px solid #ddd; border-radius:8px; display:block; }
+  #bar { margin-top:10px; }
+  button { font-size:14px; padding:6px 14px; margin-right:8px; cursor:pointer; }
+  span { font-size:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1240" height="800"></canvas>
+  <div id="errbar" style="color:red;font-size:13px;margin-top:6px;"></div>
+  <div id="bar">
+    <button id="btnPlay">暂停</button>
+    <button id="btnSlow">慢速</button>
+    <button id="btnFast">快速</button>
+    <button id="btnReset">复位</button>
+    <span id="speed">当前：1 像素 / 450ms</span>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+window.onerror=function(msg,src,line,col){
+  document.getElementById('errbar').textContent='JS错误: '+msg+' @'+line+':'+col;
+};
+
+// ---------- 演示模型：12×6 输入图，3×3 窗口，stride=1 ----------
+const C=12, R=6, K=3;
+const AC=34;                 // 输入图格尺寸
+const AX=40, AY=150;         // 输入图原点
+const BX=520, BY=150, BC=26; // 行缓存原点/格尺寸
+const CX=890, CY=150, CC=46; // 窗口放大图
+const OX=890, OY=320, OC=18; // 输出特征图
+
+let r=0, c=0;                // 当前到达像素
+let arrived, reuse, outDone; // 状态
+let beat=0, windows=0, naive=0;
+let playing=true, beatMs=450, acc=0, lastT=0, done=false;
+let tokens=[], flashes=[], shiftFlash=0;
+
+function reset(){
+  arrived=Array.from({length:R},()=>Array(C).fill(false));
+  reuse  =Array.from({length:R},()=>Array(C).fill(0));
+  outDone=Array.from({length:R-K+1},()=>Array(C-K+1).fill(false));
+  r=0;c=0;beat=0;windows=0;naive=0;done=false;tokens=[];flashes=[];shiftFlash=0;
+}
+reset();
+
+// ---------- 每拍逻辑 ----------
+function step(){
+  if(done) return;
+  arrived[r][c]=true;
+  flashes.push({x:AX+c*AC+AC/2, y:AY+r*AC+AC/2, life:1, color:'#d62728', max:22});
+  // 行缓存：计算当前缓存的行区间 [base, r]
+  const base = r>=K-1 ? r-(K-1) : 0;
+  const slot = r-base;
+  tokens.push({x1:AX+c*AC+AC/2, y1:AY+r*AC+AC/2,
+               x2:BX+c*BC+BC/2, y2:BY+slot*BC+BC/2, prog:0, speed:0.08, color:'#2b6cb0', r:4});
+  // 窗口可发射：底右角 (r,c) 到位
+  if(r>=K-1 && c>=K-1){
+    const wr=r-(K-1), wc=c-(K-1);
+    windows++; naive+=K*K;
+    for(let i=0;i<K;i++)for(let j=0;j<K;j++) reuse[wr+i][wc+j]++;
+    // 9 个像素令牌 从行缓存飞向窗口放大图
+    for(let i=0;i<K;i++)for(let j=0;j<K;j++){
+      tokens.push({x1:BX+(wc+j)*BC+BC/2, y1:BY+i*BC+BC/2,
+                   x2:CX+j*CC+CC/2, y2:CY+i*CC+CC/2, prog:0, speed:0.06, color:'#e6a800', r:3.5});
+    }
+    // 输出令牌 飞向输出特征图
+    tokens.push({x1:CX+CC, y1:CY+CC*K+24,
+                 x2:OX+wc*OC+OC/2, y2:OY+wr*OC+OC/2, prog:0, speed:0.05, color:'#2f9e44', r:4, out:[wr,wc]});
+  }
+  // 光栅推进
+  c++;
+  if(c>=C){ c=0; r++; shiftFlash=1; }
+  if(r>=R){ done=true; }
+  beat++;
+}
+
+// ---------- 绘制 ----------
+function reuseColor(n){
+  // 0 → 浅灰蓝，9 → 深绿
+  const t=n/9;
+  const rr=Math.round(238+(47-238)*t), gg=Math.round(242+(158-242)*t), bb=Math.round(251+(68-251)*t);
+  return `rgb(${rr},${gg},${bb})`;
+}
+function arrow(x1,y1,x2,y2,color,w=2){
+  ctx.strokeStyle=color;ctx.lineWidth=w;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1);
+  ctx.beginPath();ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-7*Math.cos(a-0.4),y2-7*Math.sin(a-0.4));
+  ctx.lineTo(x2-7*Math.cos(a+0.4),y2-7*Math.sin(a+0.4));
+  ctx.closePath();ctx.fillStyle=color;ctx.fill();
+}
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#222';ctx.font='bold 20px "Microsoft YaHei"';
+  ctx.fillText('滑动窗口的本质是缓存：每个输入像素被 3×3=9 个窗口复用，行缓存让上游只送 1 次', 30, 34);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#666';
+  ctx.fillText('对应真实 RTL：input_layer.sv 的 sdp_ram 行缓存（真实尺寸 3 行 × 1280 像素；stride=2 时末两行改乒乓写）+ 列缓存 + 零填充', 30, 58);
+
+  // ===== Panel A：输入图 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('① 输入图像（光栅到达，格内数字 = 被窗口复用次数）', AX, AY-12);
+  for(let i=0;i<R;i++)for(let j=0;j<C;j++){
+    ctx.fillStyle = arrived[i][j] ? reuseColor(reuse[i][j]) : '#f3f3f3';
+    ctx.fillRect(AX+j*AC, AY+i*AC, AC-2, AC-2);
+    if(reuse[i][j]>0){
+      ctx.fillStyle='#111';ctx.font='bold 13px sans-serif';
+      ctx.fillText(reuse[i][j], AX+j*AC+AC/2-4, AY+i*AC+AC/2+5);
+    }
+  }
+  // ===== Panel B：行缓存 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('② 行缓存（片上 RAM，只存最近 3 行）', BX, BY-12);
+  const base = r>=K-1 ? r-(K-1) : 0;
+  for(let s=0;s<K;s++){
+    const imgRow = base+s;
+    ctx.font='11px "Microsoft YaHei"';ctx.fillStyle='#888';
+    ctx.fillText('行'+imgRow, BX-30, BY+s*BC+BC/2+4);
+    for(let j=0;j<C;j++){
+      const filled = imgRow<=r && arrived[imgRow] && arrived[imgRow][j];
+      ctx.fillStyle = filled ? '#dce9fb' : '#f3f3f3';
+      ctx.fillRect(BX+j*BC, BY+s*BC, BC-2, BC-2);
+    }
+  }
+  // 当前窗口红框
+  if(r>=K-1 && c>=K-1 && !done){
+    const wc=c-(K-1);
+    ctx.strokeStyle='#d62728';ctx.lineWidth=2.5;
+    ctx.strokeRect(BX+wc*BC-1, BY-1, K*BC, K*BC);
+    ctx.fillStyle='#d62728';ctx.font='11px "Microsoft YaHei"';
+    ctx.fillText('当前窗口', BX+wc*BC, BY+K*BC+14);
+  }
+  // 行下移提示
+  if(shiftFlash>0){
+    ctx.fillStyle='rgba(43,108,176,'+shiftFlash+')';ctx.font='bold 13px "Microsoft YaHei"';
+    ctx.fillText('⇓ 新行到达：缓存行整体下移，最旧行被挤出（即被覆盖）', BX, BY+K*BC+34);
+    shiftFlash-=0.03;
+  }
+  // ===== Panel C：窗口放大 + PE =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('③ 窗口放大 → 9-PE 乘加', CX, CY-12);
+  if(r>=K-1 && c>=K-1){
+    const wr=Math.min(r-(K-1),R-K), wc=done?C-K:c-(K-1);
+    for(let i=0;i<K;i++)for(let j=0;j<K;j++){
+      ctx.fillStyle='#fff7e0';ctx.fillRect(CX+j*CC, CY+i*CC, CC-2, CC-2);
+      ctx.fillStyle='#555';ctx.font='11px sans-serif';
+      ctx.fillText('p'+( (wr+i)*C+(wc+j) ), CX+j*CC+8, CY+i*CC+CC/2+4);
+    }
+    ctx.strokeStyle='#d62728';ctx.lineWidth=2;ctx.strokeRect(CX-1,CY-1,K*CC,K*CC);
+    ctx.font='12px "Microsoft YaHei"';ctx.fillStyle='#b8860b';
+    ctx.fillText('9 个像素 × 9 个权重 → 1 个输出像素', CX, CY+K*CC+20);
+    ctx.fillText('（权重来自本片层自己的 ROM，不经过这里）', CX, CY+K*CC+38);
+  } else {
+    ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#999';
+    ctx.fillText('流水线填充期：', CX, CY+20);
+    ctx.fillText('缓存未满 3 行 3 列，窗口还不能发射', CX, CY+42);
+  }
+  // ===== 输出特征图 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('④ 输出特征图（逐像素产生，立即送下一层）', OX, OY-12);
+  for(let i=0;i<R-K+1;i++)for(let j=0;j<C-K+1;j++){
+    ctx.fillStyle = outDone[i][j] ? '#bfe3c6' : '#f3f3f3';
+    ctx.fillRect(OX+j*OC, OY+i*OC, OC-2, OC-2);
+  }
+  // 面板间箭头
+  arrow(AX+C*AC+8, AY+K*AC/2, BX-10, BY+K*BC/2, '#888');
+  arrow(BX+C*BC+8, BY+K*BC/2, CX-10, CY+K*CC/2, '#888');
+
+  // ===== 令牌与闪光 =====
+  tokens=tokens.filter(t=>t.prog<=1);
+  for(const t of tokens){
+    const x=t.x1+(t.x2-t.x1)*t.prog, y=t.y1+(t.y2-t.y1)*t.prog;
+    ctx.beginPath();ctx.arc(x,y,t.r,0,Math.PI*2);ctx.fillStyle=t.color;ctx.fill();
+    t.prog+=t.speed;
+    if(t.prog>1 && t.out) outDone[t.out[0]][t.out[1]]=true;
+  }
+  flashes=flashes.filter(f=>f.life>0);
+  for(const f of flashes){
+    ctx.beginPath();ctx.arc(f.x,f.y,6+(1-f.life)*f.max,0,Math.PI*2);
+    ctx.strokeStyle=f.color.replace(')',','+f.life+')').replace('rgb','rgba').replace('#d62728','rgba(214,39,40,'+f.life+')');
+    ctx.lineWidth=2;ctx.stroke();f.life-=0.05;
+  }
+
+  // ===== 底部统计 =====
+  const sy=560;
+  ctx.fillStyle='#fafbfc';ctx.fillRect(30,sy,1180,150);
+  ctx.strokeStyle='#ccc';ctx.strokeRect(30,sy,1180,150);
+  ctx.font='bold 15px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('缓存收益实时账簿', 50, sy+28);
+  ctx.font='14px "Microsoft YaHei"';ctx.fillStyle='#222';
+  const up = beat;
+  ctx.fillText('已到达像素（= 上游送数次数）：'+up+' 次', 50, sy+58);
+  ctx.fillText('已产出窗口：'+windows+' 个', 50, sy+84);
+  ctx.fillStyle='#c05621';
+  ctx.fillText('若没有缓存，需要向上游读取：'+naive+' 次（每窗口 9 次）', 450, sy+58);
+  ctx.fillStyle='#2f9e44';
+  ctx.fillText('有了行缓存，这 '+naive+' 次读取全部命中片上 RAM', 450, sy+84);
+  ctx.fillStyle='#111';ctx.font='bold 16px "Microsoft YaHei"';
+  const ratio = up>0 ? (naive/up).toFixed(2) : '0.00';
+  ctx.fillText('带宽放大倍数 = '+ratio+'×（跑完一帧趋近 5×；图越大越趋近 9× = K²）', 850, sy+58);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#555';
+  ctx.fillText('缓存三要素本演示全覆盖：容量按访问模式定死（3行×行宽）｜命中是确定性调度，无命中/缺失判断｜用片上存储换上游带宽', 50, sy+118);
+  if(done){
+    ctx.fillStyle='#2f9e44';ctx.font='bold 15px "Microsoft YaHei"';
+    ctx.fillText('✔ 一帧跑完：上游仅 '+up+' 次送数，支撑了 '+windows+' 个窗口 × 9 = '+naive+' 次读取。内部像素复用达 9 次，边缘少（零填充补齐）。', 50, sy+142);
+  }
+
+  // 时钟
+  ctx.font='bold 14px sans-serif';ctx.fillStyle='#222';
+  ctx.fillText('beat：'+beat, 30, 780);
+  ctx.font='12px "Microsoft YaHei"';ctx.fillStyle='#666';
+  ctx.fillText('蓝点 = 新像素写入行缓存｜金点 = 窗口 9 像素送 PE｜绿点 = 输出像素流入输出特征图', 130, 780);
+}
+
+// ---------- 主循环 ----------
+function loop(ts){
+  if(!lastT)lastT=ts;
+  const dt=ts-lastT;lastT=ts;
+  if(playing&&!done){
+    acc+=dt;
+    while(acc>=beatMs){acc-=beatMs;step();}
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.getElementById('btnPlay').onclick=e=>{playing=!playing;e.target.textContent=playing?'暂停':'播放';};
+document.getElementById('btnSlow').onclick=()=>{beatMs=900;document.getElementById('speed').textContent='当前：1 像素 / 900ms';};
+document.getElementById('btnFast').onclick=()=>{beatMs=150;document.getElementById('speed').textContent='当前：1 像素 / 150ms';};
+document.getElementById('btnReset').onclick=()=>{reset();};
+</script>
+</body>
+</html>
