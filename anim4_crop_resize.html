@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>④ 坐标还原与裁剪：检测框 → 双线性插值 → 80×20</title>
+<style>
+  body { margin:0; background:#f4f5f7; font-family:"Microsoft YaHei",sans-serif; }
+  #wrap { width:1260px; margin:16px auto; }
+  canvas { background:#fff; border:1px solid #ddd; border-radius:8px; display:block; }
+  button { font-size:14px; padding:6px 14px; margin-right:8px; cursor:pointer; }
+  span { font-size:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1240" height="800"></canvas>
+  <div id="bar" style="margin-top:10px">
+    <button id="btnPlay">暂停</button>
+    <button id="btnSlow">慢速</button>
+    <button id="btnFast">快速</button>
+    <button id="btnReset">复位</button>
+    <span id="speed">当前速度正常</span>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+// 真实坐标（像素）：检测网格 (40,22)，L=R=40, T=B=8（×2）
+const GX=40, GY=22, L=40, T=8, R=40, B=8;
+const cx0=GX*16+8, cy0=GY*16+8;
+const rawBox={x0:cx0-L*2, y0:cy0-T*2, x1:cx0+R*2, y1:cy0+B*2};
+const box={x0:rawBox.x0-10, y0:rawBox.y0-5, x1:rawBox.x1+10, y1:rawBox.y1+5}; // 外扩+10/+5
+const CW=80, CH=20;                          // 裁剪目标 80×20（= LPRNet 输入）
+const xstep=(box.x1-box.x0)/CW, ystep=(box.y1-box.y0)/CH;
+// 显示
+const FX=40, FY=205, FS=0.375;               // 源帧显示 1280×720 → 480×270
+const TX=620, TY=170, TS=4;                  // 目标显示 80×20 → 320×80
+const IX=620, IY=330;                        // 双线性细节区
+
+let sweepY=0, filledRows=0, phase=0, beat=0;
+let playing=true, beatMs=120, acc=0, lastT=0;
+let rowFlash=-1;
+
+// 生成一块假车牌源图内容（蓝底白字条纹，仅示意）
+function srcPix(x,y){
+  if(x>=box.x0&&x<box.x1&&y>=box.y0&&y<box.y1){
+    const u=(x-box.x0)/(box.x1-box.x0);
+    const stripe=Math.floor(u*14)%2;
+    return stripe? 235 : 40;   // 字符条纹
+  }
+  return 90+((x*7+y*13)%40);
+}
+
+function step(){
+  if(phase===0){ // 包到达 + 解码展示 8 拍
+    if(beat>=8){ phase=1; }
+  } else if(phase===1){ // 光栅扫描
+    sweepY+=3;
+    // 扫描线每越过一行目标采样线，就产出一行裁剪像素
+    while(filledRows<CH && sweepY/FS >= box.y0+filledRows*ystep){
+      rowFlash=filledRows; filledRows++;
+    }
+    if(sweepY>=720*FS*FS+270) { /* noop */ }
+    if(sweepY>=270){ phase=2; }
+  }
+  beat++;
+}
+function reset(){ sweepY=0;filledRows=0;phase=0;beat=0;rowFlash=-1; }
+reset();
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#222';ctx.font='bold 20px "Microsoft YaHei"';
+  ctx.fillText('裁剪（box_overlay_sync）：检测包解码坐标 → 外扩+10/+5 → 光栅扫过时双线性插值出 80×20 → 送 LPRNet', 30, 34);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#666';
+  ctx.fillText('不存整帧、不回写 DDR：一行 line_buf 缓存当前扫描行，边扫边采样；目标尺寸恒定 = LPRNet 输入（IMG_COL_LAYER20=80, IMG_ROW_LAYER20=20）', 30, 58);
+
+  // ===== 解码过程 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('① 检测包 → 坐标还原（GRID_STRIDE_CENTER=16，LTRB×2）', FX, 92);
+  ctx.font='13px monospace';ctx.fillStyle='#1d4e89';
+  const lines=[
+    'cx = '+GX+'×16+8 = '+cx0+'        cy = '+GY+'×16+8 = '+cy0,
+    'xmin = cx − L×2 = '+cx0+' − '+L+'×2 = '+rawBox.x0+'   xmax = cx + R×2 = '+rawBox.x1,
+    'ymin = cy − T×2 = '+rawBox.y0+'          ymax = cy + B×2 = '+rawBox.y1,
+    '外扩+10/+5 并钳位 → 最终框 ('+box.x0+','+box.y0+') ~ ('+box.x1+','+box.y1+') = '+(box.x1-box.x0)+'×'+(box.y1-box.y0)+' px'
+  ];
+  for(let i=0;i<lines.length;i++){
+    if(phase===0 && i>beat/2) break;   // 逐行揭示
+    ctx.fillText(lines[i], FX, 112+i*18);
+  }
+
+  // ===== ② 源帧 + 光栅 + 框 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('② 视频帧光栅扫描（1280×720，红框=裁剪区域）', FX, FY-12);
+  // 帧底
+  ctx.fillStyle='#e9e9e9';ctx.fillRect(FX,FY,480,270);
+  // 框内画示意车牌纹理
+  if(phase>=1){
+    for(let dy=0;dy<(box.y1-box.y0)*FS;dy+=2){
+      for(let dx=0;dx<(box.x1-box.x0)*FS;dx+=2){
+        const sx=box.x0+dx/FS, sy=box.y0+dy/FS;
+        const v=srcPix(sx|0,sy|0);
+        ctx.fillStyle='rgb('+v+','+v+','+(v>100?255:v)+')';
+        ctx.fillRect(FX+box.x0*FS+dx, FY+box.y0*FS+dy, 2, 2);
+      }
+    }
+  }
+  // 框
+  if(phase>=1){
+    ctx.strokeStyle='#d62728';ctx.lineWidth=2;
+    ctx.strokeRect(FX+box.x0*FS, FY+box.y0*FS, (box.x1-box.x0)*FS, (box.y1-box.y0)*FS);
+    ctx.fillStyle='#d62728';ctx.font='11px "Microsoft YaHei"';
+    ctx.fillText((box.x1-box.x0)+'×'+(box.y1-box.y0), FX+box.x0*FS, FY+box.y0*FS-4);
+  }
+  // 光栅线
+  if(phase===1){
+    ctx.strokeStyle='#2b6cb0';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(FX,FY+sweepY);ctx.lineTo(FX+480,FY+sweepY);ctx.stroke();
+    ctx.fillStyle='#2b6cb0';ctx.font='11px "Microsoft YaHei"';
+    ctx.fillText('当前扫描行 y='+(sweepY/FS).toFixed(0), FX+380, FY+sweepY-6);
+  }
+
+  // ===== ③ 裁剪目标 80×20 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('③ 双线性插值缩放输出 80×20（crop_rgb_out）', TX, TY-12);
+  ctx.fillStyle='#f2f2f2';ctx.fillRect(TX,TY,CW*TS,CH*TS);
+  for(let j=0;j<filledRows;j++){
+    const sy=box.y0+j*ystep;
+    for(let i=0;i<CW;i++){
+      const v=srcPix((box.x0+i*xstep)|0, sy|0);
+      ctx.fillStyle='rgb('+v+','+v+','+(v>100?255:v)+')';
+      ctx.fillRect(TX+i*TS, TY+j*TS, TS, TS);
+    }
+  }
+  if(rowFlash>=0 && phase===1){
+    ctx.strokeStyle='rgba(47,158,68,0.9)';ctx.lineWidth=2;
+    ctx.strokeRect(TX, TY+rowFlash*TS, CW*TS, TS);
+  }
+  ctx.fillStyle='#555';ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText('已产出 '+filledRows+'/20 行　x_step='+xstep.toFixed(2)+'px　y_step='+ystep.toFixed(2)+'px（定点 DDA, FRAC_BITS=8）', TX, TY+CH*TS+20);
+
+  // ===== ④ 双线性插值细节 =====
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('④ 一个输出像素怎么来：取源图最近 4 邻像素加权', IX, IY-12);
+  const px=IX+20, py=IY+10, PS=64;
+  const wts=[['p00','(1-dx)(1-dy)'],['p01','dx(1-dy)'],['p10','(1-dx)dy'],['p11','dx·dy']];
+  const pos=[[0,0],[1,0],[0,1],[1,1]];
+  for(let k=0;k<4;k++){
+    const [cxp,cyp]=pos[k];
+    ctx.fillStyle='#dce9fb';ctx.fillRect(px+cxp*PS, py+cyp*PS, PS-2, PS-2);
+    ctx.fillStyle='#333';ctx.font='bold 12px monospace';
+    ctx.fillText(wts[k][0], px+cxp*PS+6, py+cyp*PS+22);
+    ctx.font='11px monospace';ctx.fillStyle='#666';
+    ctx.fillText(wts[k][1], px+cxp*PS+6, py+cyp*PS+42);
+  }
+  // 采样点
+  ctx.beginPath();ctx.arc(px+PS*0.7, py+PS*0.6, 6, 0, Math.PI*2);
+  ctx.fillStyle='#d62728';ctx.fill();
+  ctx.font='12px "Microsoft YaHei"';ctx.fillStyle='#555';
+  ctx.fillText('红点 = 目标像素 (i,j) 反投影到源图的位置（非整数）', IX, IY+PS*2+34);
+  ctx.fillText('值 = Σ 4邻像素 × 面积权重 —— 硬件用两行 line_buf + 两级插值器流水完成', IX, IY+PS*2+54);
+  ctx.fillText('小框不足 40×10 会补齐；框越界会被钳位；最多同时 6 个框（MAX_BOX_NUM）', IX, IY+PS*2+74);
+
+  // ===== 完成横幅 =====
+  ctx.fillStyle='#fafbfc';ctx.fillRect(30,600,1180,120);
+  ctx.strokeStyle='#ccc';ctx.strokeRect(30,600,1180,120);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#444';
+  ctx.fillText('时序要点：光栅扫到 box_ymin 启动裁剪（crop_active），扫到 box_ymax 完成（crop_done）；每行命中时逐像素输出 crop_wr_en+crop_rgb_out。', 50, 628);
+  ctx.fillText('同时记录 crop_x_min/y_min —— 之后 char_overlay 把识别出的字符画回这个位置。裁剪结果写入每框专属的异步 FIFO（见动画⑤）。', 50, 652);
+  ctx.fillText('检测帧与裁剪共用同一场扫描：框顶部若在本帧已被扫过（框来得太晚），本帧不裁剪、槽位保留到下一帧。', 50, 676);
+  if(phase===2){
+    ctx.fillStyle='#2f9e44';ctx.font='bold 15px "Microsoft YaHei"';
+    ctx.fillText('✔ 一帧扫描结束：任意 '+(box.x1-box.x0)+'×'+(box.y1-box.y0)+' 的检测框已被归一化成 80×20 —— 这就是 LPRNet 不怕车牌远近大小的原因', 50, 704);
+  }
+  ctx.font='bold 14px sans-serif';ctx.fillStyle='#222';
+  ctx.fillText('beat：'+beat, 30, 780);
+}
+
+function loop(ts){
+  if(!lastT)lastT=ts;
+  const dt=ts-lastT;lastT=ts;
+  if(playing&&phase<2){acc+=dt;while(acc>=beatMs){acc-=beatMs;step();}}
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+document.getElementById('btnPlay').onclick=e=>{playing=!playing;e.target.textContent=playing?'暂停':'播放';};
+document.getElementById('btnSlow').onclick=()=>{beatMs=300;};
+document.getElementById('btnFast').onclick=()=>{beatMs=40;};
+document.getElementById('btnReset').onclick=()=>{reset();};
+</script>
+</body>
+</html>

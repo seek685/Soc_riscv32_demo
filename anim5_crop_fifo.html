@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>⑤ 跨时钟传送带：每框一个异步 FIFO，逐框喂 LPRNet</title>
+<style>
+  body { margin:0; background:#f4f5f7; font-family:"Microsoft YaHei",sans-serif; }
+  #wrap { width:1260px; margin:16px auto; }
+  canvas { background:#fff; border:1px solid #ddd; border-radius:8px; display:block; }
+  button { font-size:14px; padding:6px 14px; margin-right:8px; cursor:pointer; }
+  span { font-size:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1240" height="800"></canvas>
+  <div id="bar" style="margin-top:10px">
+    <button id="btnPlay">暂停</button>
+    <button id="btnSlow">慢速</button>
+    <button id="btnFast">快速</button>
+    <button id="btnReset">复位</button>
+    <span>1 beat / 260ms</span>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+// 模型：FIFO 容量 1600 像素（=80×20）；写侧 video 域 160px/beat，读侧 clk_pe 域 200px/beat
+const CAP=1600, WR=160, RD=200, NBOX=6;
+// 本帧剧本：4 个真框 + 1 个半途框（box3 写到 600 时目标丢失）
+const SCRIPT=[
+  {start:0},   // box0
+  {start:12},  // box1
+  {start:24},  // box2
+  {start:36, half:true},  // box3 半途框
+  {start:46},  // box4
+];
+let beat, lanes, reader, blackFrame, tokens, dropped, doneFlag;
+let playing=true, beatMs=260, acc=0, lastT=0;
+
+function reset(){
+  beat=0; dropped=0; doneFlag=false; tokens=[];
+  lanes=[];
+  for(let i=0;i<NBOX;i++) lanes.push({fill:0, state:'idle'}); // idle/writing/ready/reading/drained/void
+  reader={idx:-1, gap:0, busy:false};
+  blackFrame={fill:0, state:'idle'}; // idle/filling/reading/drained
+}
+reset();
+
+const FX=60, FY=150, FW=520, FH=34, FGAP=26;   // FIFO 泳道
+const LRX=880;                                  // LPRNet 位置
+
+function step(){
+  beat++;
+  // ---- 写侧（video 域） ----
+  for(let k=0;k<SCRIPT.length;k++){
+    const sc=SCRIPT[k], ln=lanes[k];
+    if(beat>=sc.start && ln.state==='idle') ln.state='writing';
+    if(ln.state==='writing'){
+      ln.fill+=WR;
+      tokens.push({x1:FX-14,y1:FY+k*(FH+FGAP)+FH/2,x2:FX+ln.fill/CAP*FW,y2:FY+k*(FH+FGAP)+FH/2,prog:0,speed:0.12,color:'#2b6cb0',r:3.5});
+      if(sc.half && ln.fill>=600){ ln.state='void'; ln.fill=0; dropped++; }
+      else if(!sc.half && ln.fill>=CAP){ ln.fill=CAP; ln.state='ready'; }
+    }
+  }
+  // ---- 读侧（clk_pe 域） ----
+  if(reader.gap>0){ reader.gap--; }
+  else if(reader.idx<0){
+    // 找最小的 ready 框
+    for(let k=0;k<NBOX;k++) if(lanes[k].state==='ready'){ reader.idx=k; lanes[k].state='reading'; break; }
+    // 没有真框可读：若写侧全部结束且黑帧未读，启动黑帧冲刷
+    if(reader.idx<0){
+      const allWritten = SCRIPT.every((sc,k)=>['ready','reading','drained','void'].includes(lanes[k].state) && lanes[k].state!=='writing');
+      const anyReady = lanes.some(l=>l.state==='ready'||l.state==='reading');
+      if(allWritten && !anyReady && blackFrame.state==='idle') blackFrame.state='reading', blackFrame.fill=CAP;
+    }
+  }
+  if(reader.idx>=0){
+    const ln=lanes[reader.idx];
+    ln.fill-=RD;
+    tokens.push({x1:FX+FW+10,y1:FY+reader.idx*(FH+FGAP)+FH/2,x2:LRX-10,y2:330,prog:0,speed:0.06,color:'#2f9e44',r:4});
+    if(ln.fill<=0){ ln.fill=0; ln.state='drained'; reader.idx=-1; reader.gap=2; } // LINE_GAP
+  } else if(blackFrame.state==='reading'){
+    blackFrame.fill-=RD;
+    tokens.push({x1:FX+FW+10,y1:FY+NBOX*(FH+FGAP)+10,x2:LRX-10,y2:330,prog:0,speed:0.06,color:'#555',r:4});
+    if(blackFrame.fill<=0){ blackFrame.fill=0; blackFrame.state='drained'; doneFlag=true; }
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#222';ctx.font='bold 20px "Microsoft YaHei"';
+  ctx.fillText('crop_buffer_manager：每个检测框一条 1600 像素异步 FIFO，跨时钟后逐框轮转喂 LPRNet', 30, 34);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#666';
+  ctx.fillText('写侧 = video 域（裁剪像素流入）；读侧 = clk_pe 域（LPRNet 消费）。黑帧冲刷 = 真框读完后补一张全黑图，把流水线排空形成帧边界', 30, 58);
+
+  // 域分隔
+  ctx.strokeStyle='#bbb';ctx.setLineDash([6,5]);ctx.beginPath();
+  ctx.moveTo(700,90);ctx.lineTo(700,560);ctx.stroke();ctx.setLineDash([]);
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#2b6cb0';
+  ctx.fillText('video 时钟域（写）', 60, 92);
+  ctx.fillStyle='#2f9e44';
+  ctx.fillText('clk_pe 时钟域（读）', 880, 92);
+  ctx.fillStyle='#888';ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText('异步 FIFO 跨时钟', 640, 575);
+
+  // FIFO 泳道
+  for(let k=0;k<NBOX;k++){
+    const y=FY+k*(FH+FGAP), ln=lanes[k];
+    ctx.fillStyle='#f2f2f2';ctx.fillRect(FX,y,FW,FH);
+    ctx.strokeStyle='#ccc';ctx.strokeRect(FX,y,FW,FH);
+    if(ln.fill>0){
+      ctx.fillStyle = ln.state==='reading' ? '#9fd4ad' : '#a8c6e8';
+      ctx.fillRect(FX, y, ln.fill/CAP*FW, FH);
+    }
+    ctx.fillStyle='#333';ctx.font='12px "Microsoft YaHei"';
+    let st={idle:'空闲',writing:'写入中 '+((ln.fill/CAP*100)|0)+'%',ready:'就绪（box_ready=1）',reading:'LPRNet 读取中…',drained:'已读完 ✓',void:'✗ 半途框作废丢弃'}[ln.state];
+    ctx.fillText('box'+k+'　'+st, FX+6, y+FH/2+4);
+    if(ln.state==='writing'){
+      ctx.fillStyle='#d62728';
+      ctx.beginPath();ctx.arc(FX+ln.fill/CAP*FW, y+FH/2, 5, 0, Math.PI*2);ctx.fill();
+    }
+  }
+  // 黑帧泳道
+  const by=FY+NBOX*(FH+FGAP)+10;
+  ctx.fillStyle='#f2f2f2';ctx.fillRect(FX,by,FW,FH);
+  ctx.strokeStyle='#999';ctx.strokeRect(FX,by,FW,FH);
+  if(blackFrame.fill>0){
+    ctx.fillStyle='#666';ctx.fillRect(FX,by,blackFrame.fill/CAP*FW,FH);
+  }
+  ctx.fillStyle='#333';ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText('黑帧（虚拟框）　'+({idle:'等待真框读完',reading:'冲刷 LPRNet 流水线中…',drained:'完成 → 帧边界 result_done'}[blackFrame.state]), FX+6, by+FH/2+4);
+
+  // LPRNet 消费端
+  ctx.fillStyle='#eef3fa';ctx.fillRect(LRX,280,240,100);
+  ctx.strokeStyle='#2f9e44';ctx.lineWidth=2;ctx.strokeRect(LRX,280,240,100);
+  ctx.fillStyle='#222';ctx.font='bold 15px "Microsoft YaHei"';
+  ctx.fillText('LPRNet', LRX+85, 315);
+  ctx.font='12px "Microsoft YaHei"';ctx.fillStyle='#555';
+  ctx.fillText('80×20×3 输入', LRX+70, 340);
+  ctx.fillText(reader.idx>=0?'正在吃 box'+reader.idx:(reader.gap>0?'LINE_GAP 行间间隔':'等待就绪框'), LRX+55, 362);
+
+  // 令牌
+  tokens=tokens.filter(t=>t.prog<=1);
+  for(const t of tokens){
+    const x=t.x1+(t.x2-t.x1)*t.prog, y=t.y1+(t.y2-t.y1)*t.prog;
+    ctx.beginPath();ctx.arc(x,y,t.r,0,Math.PI*2);ctx.fillStyle=t.color;ctx.fill();
+    t.prog+=t.speed;
+  }
+
+  // 底部说明
+  ctx.fillStyle='#fafbfc';ctx.fillRect(30,620,1180,150);
+  ctx.strokeStyle='#ccc';ctx.strokeRect(30,620,1180,150);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#444';
+  ctx.fillText('规则一：只发"从头开始完整"的裁剪帧——写到一半目标丢失（crop 半途）的框直接作废，不进 LPRNet。', 50, 648);
+  ctx.fillText('规则二：读端逐框轮转 + 行间插 LINE_GAP，匹配 LPRNet 的 CYCLE_PERIOD 节奏；读侧比写侧快，FIFO 不会溢出。', 50, 672);
+  ctx.fillText('规则三：所有真框读完后补一张全黑图（read_box_idx==MAX_BOX_NUM），把残数据冲出流水线，产生干净的帧边界。', 50, 696);
+  ctx.fillText('作废框计数：'+dropped+'　　beat：'+beat, 50, 720);
+  if(doneFlag){
+    ctx.fillStyle='#2f9e44';ctx.font='bold 15px "Microsoft YaHei"';
+    ctx.fillText('✔ 本帧所有有效框 + 黑帧都已进入 LPRNet —— 下一页：LPRNet 输出如何变成车牌字符串（CTC 解码）', 50, 748);
+  }
+}
+
+function loop(ts){
+  if(!lastT)lastT=ts;
+  const dt=ts-lastT;lastT=ts;
+  if(playing&&!doneFlag){acc+=dt;while(acc>=beatMs){acc-=beatMs;step();}}
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+document.getElementById('btnPlay').onclick=e=>{playing=!playing;e.target.textContent=playing?'暂停':'播放';};
+document.getElementById('btnSlow').onclick=()=>{beatMs=600;};
+document.getElementById('btnFast').onclick=()=>{beatMs=90;};
+document.getElementById('btnReset').onclick=()=>{reset();};
+</script>
+</body>
+</html>

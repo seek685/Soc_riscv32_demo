@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>⑦ 结果邮箱：快照冻结 + toggle 跨时钟握手</title>
+<style>
+  body { margin:0; background:#f4f5f7; font-family:"Microsoft YaHei",sans-serif; }
+  #wrap { width:1260px; margin:16px auto; }
+  canvas { background:#fff; border:1px solid #ddd; border-radius:8px; display:block; }
+  button { font-size:14px; padding:6px 14px; margin-right:8px; cursor:pointer; }
+  span { font-size:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1240" height="820"></canvas>
+  <div id="bar" style="margin-top:10px">
+    <button id="btnPlay">暂停</button>
+    <button id="btnSlow">慢速</button>
+    <button id="btnFast">快速</button>
+    <button id="btnReset">复位</button>
+    <span>自动播放</span>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const CHARS=['皖','A','1','2','3','4','5'];
+// 相位脚本
+const PH_IDLE=0, PH_COLLECT=1, PH_SNAPSHOT=2, PH_REQ_CROSS=3, PH_CPU_VALID=4,
+      PH_CPU_READ=5, PH_POP=6, PH_ACK_CROSS=7, PH_UNLOCK=8,
+      PH_COLLECT2=9, PH_DROP=10, PH_DONE=11;
+let phase, phBeat, beat, slots, snap, dstSlots, reqT, ackT, cpuReads, dropped, frozen, valid;
+let playing=true, beatMs=700, acc=0, lastT=0;
+
+function reset(){
+  phase=PH_COLLECT; phBeat=0; beat=0;
+  slots=[]; snap=null; dstSlots=null;
+  reqT=0; ackT=0; cpuReads=0; dropped=0; frozen=false; valid=false;
+}
+reset();
+
+function step(){
+  beat++; phBeat++;
+  switch(phase){
+    case PH_COLLECT:
+      slots.push(CHARS[phBeat-1]);
+      if(phBeat>=CHARS.length){ phase=PH_SNAPSHOT; phBeat=0; }
+      break;
+    case PH_SNAPSHOT:
+      if(phBeat>=2){ snap=slots.slice(); frozen=true; reqT=1-reqT; phase=PH_REQ_CROSS; phBeat=0; }
+      break;
+    case PH_REQ_CROSS:   // toggle 过两级同步器
+      if(phBeat>=3){ phase=PH_CPU_VALID; phBeat=0; }
+      break;
+    case PH_CPU_VALID:
+      dstSlots=snap.slice(); valid=true; phase=PH_CPU_READ; phBeat=0;
+      break;
+    case PH_CPU_READ:
+      cpuReads++;
+      if(cpuReads>=3){ phase=PH_POP; phBeat=0; }
+      break;
+    case PH_POP:
+      valid=false; ackT=1-ackT; phase=PH_ACK_CROSS; phBeat=0;
+      break;
+    case PH_ACK_CROSS:
+      if(phBeat>=3){ phase=PH_UNLOCK; phBeat=0; }
+      break;
+    case PH_UNLOCK:
+      frozen=false; snap=null; slots=[]; phase=PH_COLLECT2; phBeat=0;
+      break;
+    case PH_COLLECT2:   // 第二次识别，但演示 CPU 还没（假装）读——这里让邮箱忙
+      slots.push(CHARS[phBeat-1]);
+      if(phBeat>=CHARS.length){ phase=PH_DROP; phBeat=0; }
+      break;
+    case PH_DROP:
+      if(phBeat>=2){ slots=[]; dropped++; phase=PH_DONE; }
+      break;
+  }
+}
+
+// 布局
+const LX=50, RXx=720;             // 左右域
+function slotRow(x,y,vals,label,frozenFlag){
+  ctx.font='bold 13px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText(label, x, y-8);
+  for(let i=0;i<8;i++){
+    ctx.fillStyle = vals&&i<vals.length ? '#2b6cb0' : '#f0f0f0';
+    ctx.fillRect(x+i*64, y, 58, 44);
+    ctx.strokeStyle='#9db8d2';ctx.strokeRect(x+i*64, y, 58, 44);
+    if(vals&&i<vals.length){
+      ctx.fillStyle='#fff';ctx.font='bold 20px "Microsoft YaHei"';
+      ctx.fillText(vals[i], x+i*64+18, y+30);
+    }
+  }
+  if(frozenFlag){
+    ctx.fillStyle='#c05621';ctx.font='bold 13px "Microsoft YaHei"';
+    ctx.fillText('❄ 已冻结：POP 回来之前不可改写', x+8*64+14, y+28);
+  }
+}
+function ffChain(x,y,active,dir,label){
+  // 两级触发器
+  for(let i=0;i<2;i++){
+    ctx.fillStyle = active>i ? '#ffd54f' : '#f0f0f0';
+    ctx.fillRect(x+i*70, y, 54, 34);
+    ctx.strokeStyle='#888';ctx.strokeRect(x+i*70, y, 54, 34);
+    ctx.fillStyle='#333';ctx.font='11px monospace';
+    ctx.fillText('FF'+(i+1), x+i*70+14, y+21);
+    if(i===0) arrowH(x-24, y+17, x, y+17, '#888');
+    arrowH(x+i*70+54, y+17, x+i*70+70, y+17, '#888');
+  }
+  ctx.fillStyle='#666';ctx.font='11px "Microsoft YaHei"';
+  ctx.fillText(label, x, y+52);
+}
+function arrowH(x1,y1,x2,y2,c){
+  ctx.strokeStyle=c;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1);
+  ctx.beginPath();ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-7*Math.cos(a-0.4),y2-7*Math.sin(a-0.4));
+  ctx.lineTo(x2-7*Math.cos(a+0.4),y2-7*Math.sin(a+0.4));
+  ctx.closePath();ctx.fillStyle=c;ctx.fill();
+}
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#222';ctx.font='bold 20px "Microsoft YaHei"';
+  ctx.fillText('识别结果邮箱（lpr_result_mailbox）：数据不过同步器，两个 1-bit toggle 闭环握手', 30, 34);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#666';
+  ctx.fillText('核心规则：① 发布前必须看到上次的 POP 已回来；② 发布后快照物理冻结，直到应答返回 —— 因此多比特数据无需逐位同步', 30, 58);
+
+  // 域分隔
+  ctx.strokeStyle='#bbb';ctx.setLineDash([6,5]);ctx.beginPath();
+  ctx.moveTo(700,90);ctx.lineTo(700,600);ctx.stroke();ctx.setLineDash([]);
+  ctx.font='bold 14px "Microsoft YaHei"';
+  ctx.fillStyle='#2b6cb0';ctx.fillText('CNN 时钟域（clk_pe，源端）', LX, 96);
+  ctx.fillStyle='#2f9e44';ctx.fillText('CPU 时钟域（100MHz，目的端）', RXx, 96);
+
+  // 源端：字符流 + 收集寄存器
+  ctx.font='bold 13px "Microsoft YaHei"';ctx.fillStyle='#333';
+  const phaseName=[ '', '① 字符逐个到达，压入收集寄存器（char_valid）', '② result_done：拷贝进快照并冻结，翻转 request_toggle',
+    '③ request_toggle 经两级触发器跨时钟（单比特，安全）', '④ CPU 域发现 req≠ack → 锁存到 dst_*，dst_valid=1',
+    '⑤ CPU 分多次读 MMIO：STATUS → CHARS_LO → CHARS_HI（快照冻结，读多久都行）', '⑥ CPU 写 RESULT_POP → ack 翻转',
+    '⑦ ack 经两级触发器回到源端', '⑧ 源端见 ack 回来 → 快照解锁，可发下一包',
+    '⑨ 下一次识别进行中…（演示邮箱忙）', '⑩ 完成但邮箱忙 → 整包丢弃，dropped+1，CNN 不停', '' ][phase];
+  ctx.fillText(phaseName, LX, 126);
+  slotRow(LX, 150, slots, '收集寄存器 collected_chars（64bit = 8×字符索引）', false);
+  slotRow(LX, 260, snap, '快照 snapshot_chars', frozen);
+
+  // request_toggle 位
+  ctx.font='bold 13px monospace';ctx.fillStyle='#333';
+  ctx.fillText('request_toggle', LX, 396);
+  ctx.fillStyle= reqT? '#2b6cb0':'#f0f0f0';
+  ctx.fillRect(LX, 404, 54, 34); ctx.strokeStyle='#888';ctx.strokeRect(LX,404,54,34);
+  ctx.fillStyle= reqT?'#fff':'#333';ctx.font='bold 16px monospace';
+  ctx.fillText(''+reqT, LX+22, 427);
+  // 源端空/忙指示
+  const busy = (snap!==null);
+  ctx.font='bold 13px "Microsoft YaHei"';
+  ctx.fillStyle= busy?'#c05621':'#2f9e44';
+  ctx.fillText(busy?'邮箱状态：忙（快照未取走）':'邮箱状态：空闲（可发布）', LX+130, 398);
+
+  // 同步器（去程）
+  ctx.strokeStyle='#b8860b';ctx.setLineDash([4,4]);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(LX+54,421);ctx.lineTo(736,421);ctx.stroke();ctx.setLineDash([]);
+  ffChain(760, 404, phase===PH_REQ_CROSS?phBeat:(phase>PH_REQ_CROSS?2:0), 1, '两级同步器（req 去程）');
+  // ack 回程
+  ctx.font='bold 13px monospace';ctx.fillStyle='#333';
+  ctx.fillText('acknowledge_toggle', RXx, 536);
+  ctx.fillStyle= ackT? '#2f9e44':'#f0f0f0';
+  ctx.fillRect(RXx, 544, 54, 34); ctx.strokeStyle='#888';ctx.strokeRect(RXx,544,54,34);
+  ctx.fillStyle= ackT?'#fff':'#333';ctx.font='bold 16px monospace';
+  ctx.fillText(''+ackT, RXx+22, 567);
+  ffChain(560, 544, phase===PH_ACK_CROSS?(3-phBeat):(phase>PH_ACK_CROSS?0:0), -1, '两级同步器（ack 回程）');
+
+  // CPU 侧
+  slotRow(RXx, 150, dstSlots, 'dst_chars（CPU 域锁存）'+(valid?'，dst_valid=1':''), false);
+  // MMIO 读取列表
+  ctx.font='bold 13px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('CPU 读 MMIO：', RXx, 240);
+  const reads=['0x80300000 STATUS（valid/overflow）','0x80300008 CHARS_LO（前4字符）','0x8030000C CHARS_HI（后4字符）'];
+  for(let i=0;i<3;i++){
+    const on = phase===PH_CPU_READ && cpuReads===i+1;
+    const doneR = (phase>PH_CPU_READ) || cpuReads>i;
+    ctx.fillStyle= on?'#ffd54f':(doneR?'#e6f2e8':'#f4f4f4');
+    ctx.fillRect(RXx, 252+i*30, 360, 24);
+    ctx.fillStyle='#333';ctx.font='12px monospace';
+    ctx.fillText((doneR?'✓ ':'  ')+reads[i], RXx+8, 252+i*30+17);
+  }
+  // POP
+  const popOn = phase===PH_POP;
+  ctx.fillStyle= popOn?'#2f9e44':'#f0f0f0';
+  ctx.fillRect(RXx, 360, 200, 32);
+  ctx.strokeStyle='#888';ctx.strokeRect(RXx,360,200,32);
+  ctx.fillStyle= popOn?'#fff':'#333';ctx.font='bold 13px monospace';
+  ctx.fillText('写 0x80300018 POP', RXx+30, 381);
+
+  // 丢包区
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('忙时行为演示：', RXx, 470);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#555';
+  ctx.fillText('CPU 未 POP 期间完成的新识别 → 整包丢弃', RXx, 494);
+  ctx.fillStyle='#c05621';ctx.font='bold 14px "Microsoft YaHei"';
+  ctx.fillText('dropped 计数 = '+dropped+'（软件还会从 SEQ 序号缺口发现丢包）', RXx, 518);
+  if(phase===PH_DROP){
+    ctx.strokeStyle='#c05621';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(LX+10,155);ctx.lineTo(LX+8*64-10,190);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(LX+8*64-10,155);ctx.lineTo(LX+10,190);ctx.stroke();
+    ctx.fillStyle='#c05621';ctx.font='bold 14px "Microsoft YaHei"';
+    ctx.fillText('整包丢弃！不阻塞 CNN', LX+160, 220);
+  }
+
+  // 底部因果链
+  ctx.fillStyle='#fafbfc';ctx.fillRect(30,630,1180,140);
+  ctx.strokeStyle='#ccc';ctx.strokeRect(30,630,1180,140);
+  ctx.font='bold 14px "Microsoft YaHei"';ctx.fillStyle='#333';
+  ctx.fillText('为什么这样就不会读到"两半车牌"：', 50, 658);
+  ctx.font='13px "Microsoft YaHei"';ctx.fillStyle='#444';
+  ctx.fillText('数据写快照 → 冻结 → 才翻转 request；request 跨域要 2 拍 → CPU 看到时数据早已稳定；', 50, 682);
+  ctx.fillText('CPU 读完写 POP → ack 跨域 2 拍回来 → 之前快照绝不可改写。闭环没走完，槽位不复用 —— 竞争窗口在协议上不存在。', 50, 706);
+  ctx.fillText('代价：吞吐只有 1 槽。但车牌每帧重复识别、软件本来就要 5 次一致投票，丢一包无感 —— 单槽是甜点而非妥协。beat：'+beat, 50, 730);
+  if(phase===PH_DONE){
+    ctx.fillStyle='#2f9e44';ctx.font='bold 14px "Microsoft YaHei"';
+    ctx.fillText('✔ 演示完成：第 1 包完整送达并被 POP；第 2 包因邮箱忙被整包丢弃（dropped=1）', 50, 754);
+  }
+}
+
+function loop(ts){
+  if(!lastT)lastT=ts;
+  const dt=ts-lastT;lastT=ts;
+  if(playing&&phase<PH_DONE){acc+=dt;while(acc>=beatMs){acc-=beatMs;step();}}
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+document.getElementById('btnPlay').onclick=e=>{playing=!playing;e.target.textContent=playing?'暂停':'播放';};
+document.getElementById('btnSlow').onclick=()=>{beatMs=1200;};
+document.getElementById('btnFast').onclick=()=>{beatMs=300;};
+document.getElementById('btnReset').onclick=()=>{reset();};
+</script>
+</body>
+</html>

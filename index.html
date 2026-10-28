@@ -5,33 +5,58 @@
 <title>CNN 加速器可视化演示 — Soc_riscv32</title>
 <style>
   body { margin:0; background:#f4f5f7; font-family:"Microsoft YaHei",sans-serif; }
-  #wrap { max-width:860px; margin:48px auto; background:#fff; border:1px solid #ddd; border-radius:10px; padding:32px 40px; }
+  #wrap { max-width:880px; margin:40px auto; background:#fff; border:1px solid #ddd; border-radius:10px; padding:32px 40px; }
   h1 { font-size:22px; margin:0 0 6px; }
   .sub { color:#666; font-size:14px; margin-bottom:24px; }
-  a.card { display:block; border:1px solid #ddd; border-radius:8px; padding:18px 22px; margin-bottom:16px; text-decoration:none; color:#222; transition:box-shadow .15s; }
+  a.card { display:block; border:1px solid #ddd; border-radius:8px; padding:14px 20px; margin-bottom:12px; text-decoration:none; color:#222; transition:box-shadow .15s; }
   a.card:hover { box-shadow:0 2px 10px rgba(0,0,0,.12); }
-  .t { font-size:17px; font-weight:bold; margin-bottom:6px; }
-  .d { font-size:13px; color:#555; line-height:1.7; }
+  .t { font-size:16px; font-weight:bold; margin-bottom:4px; }
+  .d { font-size:13px; color:#555; line-height:1.6; }
   .tag { display:inline-block; font-size:12px; color:#2b6cb0; background:#e8f0fb; border-radius:4px; padding:1px 8px; margin-left:8px; }
-  footer { font-size:12px; color:#999; margin-top:24px; }
+  footer { font-size:12px; color:#999; margin-top:22px; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <h1>CNN 加速器可视化演示</h1>
-  <div class="sub">配套私有主仓库 <code>Soc_riscv32</code>（FPGA 停车车牌识别 SoC）的架构动画，全部纯单文件、可离线打开。</div>
+  <h1>CNN 车牌识别链路 · 可视化动画系列</h1>
+  <div class="sub">配套私有主仓库 <code>Soc_riscv32</code>（FPGA 停车车牌识别 SoC）。按真实数据流排序：①② 在 YOLO 卷积内部，③~⑦ 从 YOLO 输出一路到 CPU。全部纯单文件、可离线打开。</div>
 
   <a class="card" href="./pipeline.html">
-    <div class="t">① 层间流水动画<span class="tag">层间流水 / PE 阵列 / 权重 ROM</span></div>
+    <div class="t">① 层间流水<span class="tag">层间流水 / PE 阵列 / 权重 ROM</span></div>
     <div class="d">三层同时工作：行缓存 3×3 滑窗 → 9-PE 脉动链 → 权重 ROM 逐拍广播（time_idx）→ 跨拍累加 + ReLU → 输出直送下一层；底部行波前图展示"同一时刻三层处理同一帧的不同行"。</div>
   </a>
 
   <a class="card" href="./line_buffer.html">
     <div class="t">② 滑动窗口 = 缓存<span class="tag">行缓存 / 数据复用 / 带宽账簿</span></div>
-    <div class="d">每个输入像素被 3×3=9 个窗口复用：输入图每格实时累计复用次数（内部像素涨到 9），行缓存只存最近 3 行、新行挤出旧行，底部实时对比"有缓存 vs 无缓存"的上游读取次数。</div>
+    <div class="d">每个输入像素被 3×3=9 个窗口复用：输入图每格实时累计复用次数（内部像素涨到 9），行缓存只存最近 3 行，底部实时对比"有缓存 vs 无缓存"的上游读取次数。</div>
   </a>
 
-  <footer>源码即本仓库对应 HTML 文件；动画逻辑为教学演示模型，参数以真实 RTL 为原型简化。</footer>
+  <a class="card" href="./anim3_yolo_postprocess.html">
+    <div class="t">③ YOLO 后处理<span class="tag">argmax / sigmoid LUT / 阈值 / 检测包</span></div>
+    <div class="d">输出特征图逐格扫描：16 通道 argmax → sigmoid 查表 → 过 CONF_THRESH=64 → 打包 32bit packet + LTRB 共 5 word；无 NMS、无数量上限，大连通区域所有过阈网格全部发包。</div>
+  </a>
+
+  <a class="card" href="./anim4_crop_resize.html">
+    <div class="t">④ 坐标还原与裁剪<span class="tag">LTRB 解码 / 外扩钳位 / 双线性插值</span></div>
+    <div class="d">检测包 → cx=idx×16+8、xmin=cx−L×2 → 外扩+10/+5 → 光栅扫过框区时用定点 DDA 双线性插值，把任意大小的框归一化成 80×20（LPRNet 输入），不存整帧、不碰 DDR。</div>
+  </a>
+
+  <a class="card" href="./anim5_crop_fifo.html">
+    <div class="t">⑤ 跨时钟传送带<span class="tag">异步 FIFO / 逐框轮转 / 黑帧冲刷</span></div>
+    <div class="d">每个检测框一条 1600 像素异步 FIFO（video 域写、clk_pe 域读）；半途框作废丢弃；读端逐框轮转加 LINE_GAP；真框读完后补黑帧把 LPRNet 流水线排空，形成帧边界。</div>
+  </a>
+
+  <a class="card" href="./anim6_lprnet_ctc.html">
+    <div class="t">⑥ LPRNet 后处理<span class="tag">空间求和 / argmax / CTC 解码</span></div>
+    <div class="d">末层输出 20×5×128：5 行空间维按列累加 → 每步 128 通道 argmax → CTC greedy（去 blank 75、去相邻重复）把 20 步冗余序列压成 7 位车牌字符索引。</div>
+  </a>
+
+  <a class="card" href="./anim7_mailbox_cdc.html">
+    <div class="t">⑦ 结果邮箱跨时钟握手<span class="tag">快照冻结 / toggle 同步 / POP 确认</span></div>
+    <div class="d">字符压入 64bit 收集寄存器 → result_done 冻结快照 → request_toggle 过两级同步器 → CPU 读 MMIO → 写 POP → ack 回程解锁；演示 CPU 忙时第二包被整包丢弃（dropped+1）。</div>
+  </a>
+
+  <footer>源码即本仓库对应 HTML 文件；动画为教学演示模型，参数以真实 RTL 为原型简化（网格尺寸、节拍数等均按可读性缩小）。</footer>
 </div>
 </body>
 </html>
