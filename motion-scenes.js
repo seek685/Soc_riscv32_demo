@@ -286,7 +286,15 @@
         const scanY = mix(45, 105, between(t, 4, 5.5));
         line(12, scanY, w - 12, scanY, newer ? green : red, 3);
       }
-      if (t >= 1) tickText('框外还有一部分', Math.max(0, w - 112), 112, red);
+      if (t >= 1) {
+        const covered = newer && margin >= 18 && t >= 3.8;
+        tickText(
+          covered ? '末尾已包含' : '框外还有一部分',
+          Math.max(0, w - 112),
+          112,
+          covered ? green : red,
+        );
+      }
       text('真正送给识别机器的小图片', 0, 164, 13, muted, 650);
       display(0, 188, w, 86, '逐行取图');
       const valid = newer && margin >= 18;

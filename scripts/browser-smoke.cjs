@@ -229,6 +229,19 @@ const server = http.createServer((req, res) => {
       pausedAt,
       'pause freezes time',
     );
+    const lastTrackStep = topics.find((topic) => topic.id === 'tracks').steps.length - 1;
+    await page.locator('#speed').selectOption('2');
+    await seek(page, lastTrackStep, 0.99);
+    await page.locator('#play').click();
+    await page.waitForFunction(() => document.body.dataset.step === '0', null, { timeout: 4000 });
+    await page.locator('#play').click();
+    await page.locator('#loop').uncheck();
+    await seek(page, lastTrackStep, 0.99);
+    await page.locator('#play').click();
+    await page.waitForFunction(() => document.querySelector('#play').textContent === '播放', null, {
+      timeout: 3000,
+    });
+    assert.equal(Number(await page.locator('body').getAttribute('data-step')), lastTrackStep);
     await page.goto(base + '/evolution.html?topic=crop');
     await page.getByRole('slider', { name: '原始检测框宽度' }).evaluate((el) => {
       el.value = '480';
