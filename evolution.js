@@ -155,8 +155,12 @@
     cw = Math.max(280, Math.round(canvas.parentElement.clientWidth));
     const panels = drawPanels();
     const phase = Math.min(0.999, elapsed / PHASE_MS);
+    const before =
+      topic.id === 'commands' && options.shell === 'powershell'
+        ? 'PowerShell：可以使用 & 启动'
+        : topic.before;
     panels.forEach((p, i) =>
-      panel(p, i ? topic.after : topic.before, !!i, (w, h, n) =>
+      panel(p, i ? topic.after : before, !!i, (w, h, n) =>
         motion.renderers[topic.id](w, h, n, step + phase, options),
       ),
     );

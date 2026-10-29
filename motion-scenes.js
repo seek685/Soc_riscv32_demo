@@ -186,13 +186,13 @@
       display(0, 260, w, 105, '要显示的画面');
       const displayedX = newer ? 18 : mix(18, w - 100, between(t, 0, 3.6));
       vehicle(displayedX, 308, 75, blue, '车');
-      if (t >= 4) {
+      if (t >= (newer ? 5 : 4)) {
         const bx = newer ? displayedX : 18;
         ctx.strokeStyle = newer ? '#82e3a8' : '#f18f81';
         ctx.lineWidth = 3;
         ctx.strokeRect(bx - 4, 304, 83, 50);
       }
-      if (t >= 4)
+      if (t >= (newer ? 5 : 4))
         caption(
           newer ? '同一张照片，框正好套住车' : '车换了位置，旧框还停在左边',
           0,
@@ -200,7 +200,12 @@
           w,
           newer ? green : red,
         );
-      if (newer && t >= 6) stamp('过期的照片丢弃', Math.max(0, w - 145), 185, red, 145);
+      if (newer && t >= 5 && t < 6)
+        ticketMove('找回第 1 张', w * 0.34, 235, 12, 274, t, 5, 5.8, green, 105);
+      if (newer && t >= 6) {
+        bin(w - 57, 185, '丢弃');
+        ticketMove('过期照片', w * 0.34, 155, w - 100, 195, t, 6, 6.8, red, 90);
+      }
     }
 
     function textLifecycle(w, h, newer, t) {
@@ -418,8 +423,8 @@
       dot(w * 0.42, 96, '#a6c2c0', 5);
       dot(w * 0.58, 96, '#a6c2c0', 5);
       text('两边工作速度不同', Math.max(0, w / 2 - 58), 111, 11, muted);
-      const ex = mix(15, w - 140, between(t, 2, 3.3));
-      const ey = mix(151, 24, between(t, 2.1, 3.5));
+      const ex = t < 1 ? mix(w * 0.25, 15, t) : mix(15, w - 140, between(t, 2, 3.3));
+      const ey = t < 1 ? mix(120, 151, t) : mix(151, 24, between(t, 2.1, 3.5));
       envelope(ex, ey, 133, t >= 1, newer);
       const letters = Array.from('粤AD12345');
       letters.forEach((value, i) => {
@@ -434,7 +439,7 @@
       if (t >= 4 && t < 6.8) {
         const x = mix(4, w * 0.35, between(t, 4, 4.9));
         const y = mix(72, 220, between(t, 4, 4.9));
-        ticket('下一张', x, y, 88, amber);
+        if (t < 5) ticket('下一张', x, y, 88, amber);
         if (t >= 5) {
           bin(w - 57, 255);
           ticketMove('下一张', w * 0.35, 220, w - 98, 276, t, 5, 5.9, red, 92);
@@ -442,8 +447,10 @@
       }
       if (t >= 5) caption('信箱还锁着，新结果整张丢弃', 0, 337, w, red);
       if (t >= 6 && t < 8.3) ticketMove('取走回执', w - 104, 100, 16, 100, t, 6, 7.7, green, 86);
-      if (t >= 8) stamp('回执到达，解锁', 0, 377, green, 140);
-      else if (t >= 1) tag('信箱锁着', 0, 261, amber, 88);
+      if (t >= 8) {
+        stamp('回执到达，解锁', 0, 377, green, 140);
+        ticketMove('新的结果', 10, 151, w - 116, 172, t, 8, 8.9, green, 100);
+      } else if (t >= 1) tag('信箱锁着', 0, 261, amber, 88);
     }
 
     function scenes(w, h, newer, t) {
@@ -483,7 +490,7 @@
         split ? green : blue,
         84,
       );
-      const clockTime = newer && t >= 1 && t < 6 ? 1 : t < 1 ? t : t - 5;
+      const clockTime = newer ? (t >= 1 && t < 6 ? 1 : t < 1 ? t : t - 5) : t;
       meter(left + fw / 2, 325, blue, clockTime, split ? '计时暂停' : '停车计时');
       if (newer && t >= 4) {
         ticketMove('普通车', w * 0.36, 205, right + 7, 291, t, 4, 4.9, blue, Math.min(90, fw - 14));
@@ -545,7 +552,7 @@
       miniScreen(w, t, newer, options);
       ctx.restore();
       const px = mix(w - 30, 70, between(t, 0.5, 1.8));
-      const py = mix(28, 126, between(t, 0.5, 1.8));
+      const py = mix(28, 126, between(t, 0.5, 1.8)) - mix(0, 16, between(t, 2.9, 3.6));
       if (t < 4.5) pointer(px, py, 0.8);
       if (!newer) {
         if (t >= 1.7) {
@@ -560,7 +567,10 @@
         rect(0, 245, w, 82, '#eaf5ef', '#a6d1bf', 10);
         center('CPU 管理程序', w / 2, 260, 13, green, 700);
         center('判断手指点在哪里', w / 2, 286, 11, muted);
-        if (t >= 2 && t < 5.8) ticketMove('手指位置', 40, 144, w * 0.36, 244, t, 2, 3.8, blue, 95);
+        if (t >= 2 && t < 4.3) ticketMove('按下位置', 40, 144, w * 0.36, 244, t, 2, 2.9, blue, 95);
+        if (t >= 3 && t < 5.8) ticketMove('松开位置', 40, 128, w * 0.36, 244, t, 3, 3.9, amber, 95);
+        if (t >= 4 && t < 5)
+          ticketMove('核对两次', w * 0.36, 244, w * 0.55, 278, t, 4, 4.8, green, 95);
         if (t >= 4 && t < 5.8) stamp('落在按钮范围', Math.max(0, w - 140), 208, green, 135);
         if (t >= 5 && t < 6.4)
           ticketMove('打开输入页', w * 0.36, 244, 35, 122, t, 5, 5.8, green, 105);
@@ -580,6 +590,11 @@
     }
     function deleteScene(w, h, newer, t) {
       display(0, 0, w, 146, '屏幕上看到的列表');
+      if (t >= 3 && t < 6.6) {
+        rect(0, 151, w, 18, '#f0e8de', '#e0cdbf', 4);
+        rect(0, 151, mix(0, w, between(t, 3, 6.6)), 18, '#b5dacf', null, 4);
+        center('屏幕正在刷新', w / 2, 154, 10, '#365e59', 700);
+      }
       const switched = newer && t >= 6.6;
       const removed = newer && t >= 7.6;
       row(
@@ -614,11 +629,12 @@
         if (t >= 4.8) caption('点的是 A，删掉的却是 B', 0, 372, w, red);
       }
       if (newer && t >= 4 && t < 6) {
-        const sx = mix(w - 82, w * 0.45, between(t, 4, 4.6));
+        const sx = mix(w - 82, w * 0.45, between(t, 4, 5.5));
         stamp('先等等', sx, 104, red, 80);
         caption('屏幕还没更新完，这次先不删', 0, 372, w, red);
       }
-      if (newer && t >= 6 && t < 7.5) caption('B 已经完整显示，再看清楚要删谁', 0, 372, w, green);
+      if (newer && t >= 6 && t < 6.6) caption('等待屏幕画完最新列表', 0, 372, w, green);
+      if (newer && t >= 6.6 && t < 7.5) caption('B 已经完整显示，再看清楚要删谁', 0, 372, w, green);
       if (newer && t >= 7) {
         ticketMove('车 B', 10, 42, w - 99, 315, t, 7.05, 7.8, amber, 85);
         if (t >= 7.8) caption('删掉真正看到的 B，A 仍然保留', 0, 372, w, green);
@@ -772,6 +788,8 @@
         arrow(w - bw / 2, 105, w * 0.45, 182, red);
         if (t >= 3) stamp('目录对不上', Math.max(0, w - 118), 269, red, 118);
       }
+      if (t >= 3 && t < 4)
+        ticketMove('查找资源', w * 0.45, 90, w * 0.35, 180, t, 3, 3.9, newer ? green : red, 96);
       if (t >= 4 && newer) {
         ticketMove('追加新背景', w * 0.34, 115, w - slotW, 203, t, 4, 5, green, 90);
         if (t >= 5.3) {

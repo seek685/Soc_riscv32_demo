@@ -151,9 +151,7 @@ const server = http.createServer((req, res) => {
         states++;
       }
       const samples = [];
-      const motionSteps = [
-        ...new Set([0, Math.floor((topic.steps.length - 1) / 2), topic.steps.length - 1]),
-      ];
+      const motionSteps = topic.steps.map((_, step) => step);
       for (const step of motionSteps) {
         await seek(page, step, 0.2);
         const caption = await page.locator('#step-caption').textContent();
@@ -210,14 +208,10 @@ const server = http.createServer((req, res) => {
             sample.changes.every((regions) =>
               regions.some((r) => r.changed >= 500 && r.width >= 55 && r.height >= 26),
             ),
-          ).length < 2,
+          ).length < Math.max(2, Math.ceil(samples.length / 2)),
       )
       .map(([id]) => id);
-    assert.deepEqual(
-      weakMotion,
-      [],
-      'at least two scenes must show substantial movement throughout',
-    );
+    assert.deepEqual(weakMotion, [], 'at least half of each story must show substantial motion');
     await page.goto(base + '/evolution.html?topic=tracks');
     await seek(page, 1, 0.15);
     await page.locator('#play').click();
@@ -322,7 +316,7 @@ const server = http.createServer((req, res) => {
       topics: topics.length,
       states,
       motionTopics: Object.keys(motion).length,
-      motionScenesPerTopic: 2,
+      motionScenesPerTopic: 'at least half',
       motionVideo: 'motion-tour.webm',
       legacyPages: 7,
       mobileWidth: 390,
