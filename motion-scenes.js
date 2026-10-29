@@ -213,7 +213,7 @@
       const movingX = mix(8, w - 98, between(t, 0, 7.5));
       if (t < 7.3) vehicle(movingX, 55, 80, blue, 'A');
       if (t < 1.1) ticketMove('车牌照片', Math.max(0, movingX - 4), 70, 8, 165, t, 0, 1, blue, 90);
-      if (t >= 7) vehicle(mix(w - 86, w * 0.55, between(t, 7, 8.6)), 55, 80, amber, 'B');
+      if (t >= 7) vehicle(mix(w - 86, 8, between(t, 7, 8.6)), 55, 80, amber, 'B');
       const chars = Array.from('粤AD12345');
       const entered = Math.min(chars.length, Math.max(0, Math.floor((t - 0.8) * 2.8)));
       rect(0, 154, w, 73, '#fff', '#d5e3e1', 9);
@@ -231,8 +231,8 @@
         if (count) plate(chars.slice(0, count).join(''), 9, 23, 120, red);
         if (t >= 3) caption('车走了，号码还在刚才的位置', 0, 244, w, red);
       }
-      if (newer && t >= 3 && t < 7.3) {
-        const q = between(t, 3.3, 5.2);
+      if (newer && entered === chars.length && t < 7.3) {
+        const q = between(t, 3.65, 5.2);
         const x = mix(8, Math.min(w - 126, movingX), q);
         const y = mix(192, 23, q);
         plate(M.PLATE_A, x, y, 120, green);
@@ -445,10 +445,11 @@
           ticketMove('下一张', w * 0.35, 220, w - 98, 276, t, 5, 5.9, red, 92);
         }
       }
-      if (t >= 5) caption('信箱还锁着，新结果整张丢弃', 0, 337, w, red);
+      if (t >= 5 && t < 8) caption('信箱还锁着，新结果整张丢弃', 0, 337, w, red);
       if (t >= 6 && t < 8.3) ticketMove('取走回执', w - 104, 100, 16, 100, t, 6, 7.7, green, 86);
       if (t >= 8) {
         stamp('回执到达，解锁', 0, 377, green, 140);
+        caption('下一次产生的结果可以送出', 0, 337, w, green);
         ticketMove('新的结果', 10, 151, w - 116, 172, t, 8, 8.9, green, 100);
       } else if (t >= 1) tag('信箱锁着', 0, 261, amber, 88);
     }

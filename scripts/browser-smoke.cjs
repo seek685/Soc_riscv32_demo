@@ -306,6 +306,7 @@ const server = http.createServer((req, res) => {
       await seek(movie, step, 0.1);
       await movie.locator('#speed').selectOption('2');
       await movie.locator('#play').click();
+      await movie.evaluate(() => window.scrollTo(0, 0));
       await movie.waitForTimeout(2000);
       await movie.locator('#play').click();
     }
