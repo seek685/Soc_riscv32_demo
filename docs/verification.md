@@ -1,6 +1,6 @@
 # 本轮演示验证
 
-日期：2026-10-29。检查对象为动画代码提交 `0023a66bac3ec94e38ab1ff077df0c2227d732a4`；本文件属于随后补充的证据记录。
+日期：2026-10-29。检查对象为动画代码提交 `72d44705b638ec53e2d69ac1d27df158405fa329`；本文件属于随后补充的证据记录。
 
 | 检查                                   | 实际结果                                                       |
 | -------------------------------------- | -------------------------------------------------------------- |
@@ -14,8 +14,10 @@
 | 页面发布                               | GitHub Pages 部署通过，在线首页 HTTP 200                       |
 | 本地 Windows Chromium                  | Mojo 通信管道创建被系统拒绝；真实浏览器验证改在 Linux CI 完成  |
 
-- [对应代码的浏览器及模型检查](https://github.com/seek685/Soc_riscv32_demo/actions/runs/40822415318)
-- [对应代码的 Pages 部署](https://github.com/seek685/Soc_riscv32_demo/actions/runs/40822415052)
+108 个桌面步骤均等待实际绘制后检查文字边界，通过；HMI 画布高度随示意屏幕尺寸调整，底部说明完整保留。
+
+- [对应代码的浏览器及模型检查](https://github.com/seek685/Soc_riscv32_demo/actions/runs/40823242761)
+- [对应代码的 Pages 部署](https://github.com/seek685/Soc_riscv32_demo/actions/runs/40823242893)
 - [自动检查工作流](../.github/workflows/demo-checks.yml)
 
 工作流 artifact `animation-browser-evidence` 保存截图及 `browser-results.json`，截图包含所有 13 个主题的桌面末状态、手机示例及主页。已人工查看桌面与手机截图，并修正目标确认后返回刑侦页、删除后的列表以及长文字换行。
