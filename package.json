@@ -1,0 +1,14 @@
+{
+  "name": "soc-riscv32-demo",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Offline educational animations for the plate-recognition FPGA SoC",
+  "scripts": {
+    "test": "node tests/models.test.cjs",
+    "check": "node scripts/check-site.cjs",
+    "test:browser": "node scripts/browser-smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.57.0"
+  }
+}
