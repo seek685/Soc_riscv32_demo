@@ -4,7 +4,9 @@
 
 入口：[GitHub Pages](https://seek685.github.io/Soc_riscv32_demo/) · [问题与改动播放器](https://seek685.github.io/Soc_riscv32_demo/evolution.html?topic=boundary)
 
-播放器支持暂停、重播、单步、进度拖动、0.5×/1×/2×、方向键与空格，移动端上下对照。“减少动态效果”系统偏好下默认暂停。裁剪页可调框宽，加载页可模拟 CRC 错误，触摸页可显示 C 坐标区域，命令页可切换终端。
+13 个对照主题用连续运动讲述过程：车辆和画框怎样错开、结果怎样进入各自的计票区、手指操作怎样变成屏幕交互。两边使用相同输入；代码与版本依据可按需展开，无需阅读代码也可观看。
+
+播放器支持循环播放、暂停、重播、单步、连续拖动进度、0.5×/1×/2×、方向键与空格，移动端上下对照。“减少动态效果”系统偏好下默认暂停。裁剪页可调框宽，加载页可模拟 CRC 错误，触摸页可显示点击范围，命令页可切换终端。
 
 | 对照主题                         | 入口                                   |
 | -------------------------------- | -------------------------------------- |
@@ -46,6 +48,6 @@ npm install
 npm run test:browser
 ```
 
-优先使用本机 Chrome / Edge，也可通过 `BROWSER_PATH` 指定路径。若使用 Playwright 自带 Chromium，先执行 `npx playwright install chromium`。截图与结果在忽略提交的 `test-artifacts/`。浏览器测试覆盖全部新主题及步骤、交互、390px 移动端、离线 file 模式和 7 个旧页面加载。
+优先使用本机 Chrome / Edge，也可通过 `BROWSER_PATH` 指定路径。若使用 Playwright 自带 Chromium，先执行 `npx playwright install chromium`。截图、录像与结果在忽略提交的 `test-artifacts/`。浏览器测试覆盖全部新主题及步骤、同一幕内的画面变化、播放与暂停、交互、390px 移动端、离线 file 模式和 7 个旧页面加载。
 
 静态 GitHub Pages，无构建步骤。

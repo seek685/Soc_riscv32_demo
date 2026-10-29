@@ -28,8 +28,10 @@ for (const name of html) {
     if (script[1].trim()) new vm.Script(script[1], { filename: name });
   }
 }
-for (const name of ['evolution-models.js', 'evolution.js'])
-  new vm.Script(fs.readFileSync(path.join(root, name), 'utf8'), { filename: name });
+for (const name of ['evolution-models.js', 'motion-scenes.js', 'evolution.js'])
+  new vm.Script(fs.readFileSync(path.join(root, name), 'utf8'), {
+    filename: name,
+  });
 console.log(
   `PASS ${html.length} HTML pages, ${checked} local references, inline/external JavaScript syntax and topic routes`,
 );

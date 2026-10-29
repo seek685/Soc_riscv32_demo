@@ -10,6 +10,7 @@
     <title>问题与改动 · Soc_riscv32 动画实验室</title>
     <link rel="stylesheet" href="evolution.css" />
     <script defer src="evolution-models.js"></script>
+    <script defer src="motion-scenes.js"></script>
     <script defer src="evolution.js"></script>
   </head>
   <body>
@@ -35,7 +36,7 @@
         <section class="player" aria-label="动画播放器">
           <div class="player-top">
             <span class="live-dot"></span><span>机制演示</span
-            ><span class="timing-note">动画节拍不等于真实硬件时钟</span>
+            ><span class="timing-note">可暂停、单步或拖动进度</span>
           </div>
           <div class="canvas-wrap">
             <canvas id="demo-canvas" role="img" aria-label="动画载入中"></canvas>
@@ -61,6 +62,7 @@
               <option value="1" selected>1×</option>
               <option value="2">2×</option>
             </select>
+            <label class="loop-label"><input id="loop" type="checkbox" checked />循环播放</label>
           </div>
         </section>
         <div class="takeaways">
@@ -69,12 +71,13 @@
             <p id="lesson"></p>
           </section>
           <section class="scope">
-            <span class="eyebrow">演示与验证范围</span>
-            <p id="scope"></p>
+            <span class="eyebrow">怎么看这段动画</span>
+            <p>两边从相同输入开始。跟着车、卡片和手指移动，就能看到问题怎样发生、后来怎样处理。</p>
           </section>
         </div>
         <details class="evidence">
           <summary>查看对应代码与版本依据</summary>
+          <p id="scope"></p>
           <p>
             以下为本次核对的主工程相对位置或历史修复记录。动画是解释模型，不会连接硬件或执行烧录。
           </p>
