@@ -100,11 +100,6 @@
     function tickText(s, x, y, color = muted) {
       text(s, x, y, 11, color, 600);
     }
-    function progressBar(x, y, w, count, color) {
-      for (let i = 0; i < 5; i++) {
-        rect(x + (i * w) / 5, y, w / 5 - 4, 18, i < count ? color : '#e3e9e6', null, 4);
-      }
-    }
     function meter(x, y, color, t, label) {
       dot(x, y, '#e6f2f1', 22);
       ctx.beginPath();
@@ -117,10 +112,6 @@
     }
     function beat(t) {
       return t - Math.floor(t);
-    }
-    function status(s, w, y, color = green) {
-      rect(0, y, w, 38, color + '0c', color + '45', 8);
-      caption(s, 10, y + 9, w - 20, color);
     }
 
     function boundary(w, h, newer, t) {
@@ -266,11 +257,16 @@
         baseW = rawWidth * pxPerSource;
       const extension = mix(0, margin * pxPerSource, between(t, 2, 3.8));
       if (t >= 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(baseX - extension - 2, 43, (baseW + 2 * extension + 4) * between(t, 1, 1.9), 64);
+        ctx.clip();
         ctx.setLineDash([5, 4]);
         ctx.strokeStyle = newer ? green : red;
         ctx.lineWidth = 2;
         ctx.strokeRect(baseX - extension, 45, baseW + 2 * extension, 60);
         ctx.setLineDash([]);
+        ctx.restore();
       }
       if (t >= 2) {
         const cropLeft = baseX - extension,
@@ -323,6 +319,19 @@
       } else if (t >= 5.2) {
         stamp('末尾也被送入', 0, 304, green, 130);
       }
+      if (t >= 6)
+        ticketMove(
+          valid ? '完整小图' : '缺字小图',
+          10,
+          222,
+          w - 110,
+          330,
+          t,
+          6,
+          6.9,
+          valid ? green : red,
+          104,
+        );
       if (t >= 3)
         caption(`框宽 ${rawWidth}，两边各多留 ${margin} 像素`, 0, 367, w, newer ? green : red);
     }
@@ -592,8 +601,11 @@
     function deleteScene(w, h, newer, t) {
       display(0, 0, w, 146, '屏幕上看到的列表');
       if (t >= 3 && t < 6.6) {
+        const refresh =
+          t < 4 ? 0.65 * between(t, 3, 4) : t < 6 ? 0.65 : 0.65 + 0.35 * between(t, 6, 6.6);
         rect(0, 151, w, 18, '#f0e8de', '#e0cdbf', 4);
-        rect(0, 151, mix(0, w, between(t, 3, 6.6)), 18, '#b5dacf', null, 4);
+        rect(0, 151, w * refresh, 18, '#b5dacf', null, 4);
+        rect(Math.max(0, w * refresh - 3), 146, 6, 28, '#65a99a', null, 3);
         center('屏幕正在刷新', w / 2, 154, 10, '#365e59', 700);
       }
       const switched = newer && t >= 6.6;
@@ -606,6 +618,11 @@
         switched && !removed ? amber : blue,
         switched && !removed ? '命中' : '普通',
       );
+      if (t >= 1 && t < 2) {
+        ctx.strokeStyle = blue;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(9, 33, (w - 18) * between(t, 1, 1.9), 36);
+      }
       row(
         9,
         77,
@@ -630,12 +647,13 @@
         if (t >= 4.8) caption('点的是 A，删掉的却是 B', 0, 372, w, red);
       }
       if (newer && t >= 4 && t < 6) {
-        const sx = mix(w - 82, w * 0.45, between(t, 4, 5.5));
+        const sx = mix(w - 82, w * 0.45, between(t, 4, 5.9));
         stamp('先等等', sx, 104, red, 80);
         caption('屏幕还没更新完，这次先不删', 0, 372, w, red);
       }
       if (newer && t >= 6 && t < 6.6) caption('等待屏幕画完最新列表', 0, 372, w, green);
       if (newer && t >= 6.6 && t < 7.5) caption('B 已经完整显示，再看清楚要删谁', 0, 372, w, green);
+      if (newer && t >= 6 && t < 6.7) ticketMove('车 B 更新', 8, 205, 18, 34, t, 6, 6.7, amber, 98);
       if (newer && t >= 7) {
         ticketMove('车 B', 10, 42, w - 99, 315, t, 7.05, 7.8, amber, 85);
         if (t >= 7.8) caption('删掉真正看到的 B，A 仍然保留', 0, 372, w, green);
@@ -753,8 +771,8 @@
         if (q > 0.5) text('工具说明：要这两样', w * 0.35 + 8, 288, 11, '#88602e');
       }
       if (t >= 5 && good) {
-        ticketMove('程序文件', 12, 194, w - 102, 347, t, 5, 6.4, blue, 96);
-        if (t >= 6.2) stamp(good ? '送给 FPGA' : '还没发送', 0, 365, good ? green : red, 105);
+        ticketMove('程序文件', 12, 194, w - 102, 347, t, 5, 6.9, blue, 96);
+        if (t >= 6.7) stamp('送给 FPGA', 0, 365, green, 105);
       }
     }
 
@@ -788,6 +806,7 @@
       if (t >= 2 && !newer) {
         arrow(w - bw / 2, 105, w * 0.45, 182, red);
         if (t >= 3) stamp('目录对不上', Math.max(0, w - 118), 269, red, 118);
+        if (t < 3) ticketMove('只更新①', w - slotW, 202, 10, 65, t, 2, 2.9, red, 96);
       }
       if (t >= 3 && t < 4)
         ticketMove('查找资源', w * 0.45, 90, w * 0.35, 180, t, 3, 3.9, newer ? green : red, 96);
@@ -797,6 +816,14 @@
           arrow(bw / 2, 105, w - slotW / 2, 182, green);
           arrow(w - bw / 2, 105, w - slotW / 2, 182, green);
         }
+      }
+      if (newer && t >= 5 && t < 6) {
+        ticketMove('更新①', w - slotW, 202, 10, 65, t, 5, 5.85, green, 80);
+        ticketMove('更新②', w - slotW, 202, w - bw + 10, 65, t, 5.1, 5.95, green, 80);
+      }
+      if (newer && t >= 6 && t < 7) {
+        ticketMove('校验①', 10, 70, 0, 281, t, 6, 6.85, green, 80);
+        ticketMove('校验②', w - bw + 10, 70, Math.min(130, w - 80), 281, t, 6.1, 6.95, green, 80);
       }
       if (t >= 6 && newer) stamp('两张都检查', 0, 280, green, 120);
       if (t >= 7) {
@@ -874,37 +901,8 @@
       container,
       latency,
     };
-    return {
-      renderers,
-      g,
-      helpers: {
-        caption,
-        tag,
-        road,
-        vehicle,
-        machine,
-        display,
-        ticket,
-        ticketMove,
-        bin,
-        pointer,
-        stamp,
-        tickText,
-        progressBar,
-        meter,
-        beat,
-        status,
-        blue,
-        amber,
-        green,
-        red,
-        paper,
-        muted,
-        between,
-        mix,
-      },
-    };
+    return { renderers };
   }
 
-  root.SoCMotion = { create, between, mix };
+  root.SoCMotion = { create };
 })(globalThis);
