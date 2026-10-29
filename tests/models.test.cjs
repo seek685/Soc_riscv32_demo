@@ -39,6 +39,11 @@ test('repeated frames, old frames and hardware flushes add no confirmation votes
   assert.equal(after.tracks.B.votes, before.tracks.B.votes);
   assert.equal(after.skipped, 3);
   assert.equal(after.accepted, 2);
+  assert.equal(
+    after.shared.name,
+    'B',
+    'the old interface has no real-ROI flag to reject this string',
+  );
 });
 test('touch needs paired same-page events, limited drag and the actual rectangle', () => {
   const down = { page: 1, x: 150, y: 365 };

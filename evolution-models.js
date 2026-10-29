@@ -374,11 +374,11 @@
       skipped = 0;
     const tracks = {};
     for (const event of events.slice(0, count)) {
-      if (event.real) {
-        if (shared.name !== event.name) shared = { name: event.name, votes: 1, first: event.ms };
-        else shared.votes++;
-        if (shared.votes >= 5 && event.ms - shared.first >= 600) oldAccepted++;
-      }
+      // The older interface cannot distinguish a syntactically valid flush
+      // result from a real ROI; only the newer branch receives that flag.
+      if (shared.name !== event.name) shared = { name: event.name, votes: 1, first: event.ms };
+      else shared.votes++;
+      if (shared.votes >= 5 && event.ms - shared.first >= 600) oldAccepted++;
       const t = tracks[event.name];
       if (!event.real || (t && event.frame <= t.frame)) {
         skipped++;

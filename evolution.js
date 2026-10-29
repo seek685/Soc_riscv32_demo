@@ -356,8 +356,8 @@
     ctx.save();
     ctx.scale(scale, scale);
     rect(0, 0, 800, 480, '#092b43', '#174660', 10);
-    text(step >= 6 && n ? '目标车牌输入' : '刑侦筛查', 30, 25, 28, '#c7f1ee', 650);
-    if (step >= 6 && n) {
+    text(step === 6 && n ? '目标车牌输入' : '刑侦筛查', 30, 25, 28, '#c7f1ee', 650);
+    if (step === 6 && n) {
       plate(M.PLATE_A, 55, 110, 310, C.blue);
       const keys = ['京', '沪', '粤', 'A', 'B', 'D', '1', '2', '3', '4', '5', '确认'];
       keys.forEach((s, i) =>
@@ -368,7 +368,7 @@
       center('切换场景', 277, 31, 20, '#b3e4e5');
       text('目标车牌', 76, 160, 21, '#86bccb');
       plate(n && step >= 7 ? M.PLATE_A : '--', 74, 190, 225, C.blue);
-      text(n ? '待设置' : '背景中的静态状态', 108, 302, 22, '#8ce1d1');
+      text(n ? (step >= 7 ? '布控中' : '待设置') : '背景中的静态状态', 108, 302, 22, '#8ce1d1');
       rect(76, 340, 216, 51, '#154c60', '#6bc4c1', 8);
       center('设置目标', 184, 353, 24, '#c4f0e8');
       rect(375, 60, 400, 330, '#092a40', '#24516a');
@@ -405,11 +405,13 @@
   function deleteScene(w, h, n) {
     const changed = step >= 2,
       complete = step >= 6;
-    const rows = !changed
-      ? ['A · 普通 · #12', 'C · 普通 · #11']
-      : ['B · 命中 · #13', 'A · 普通 · #12'];
+    const deleted = n ? step >= 7 : step >= 4;
+    const rows =
+      !changed || deleted
+        ? ['A · 普通 · #12', 'C · 普通 · #11']
+        : ['B · 命中 · #13', 'A · 普通 · #12'];
     text('屏幕上已显示', 0, 4, 11, C.muted);
-    const screenRows = complete ? rows : ['A · 普通 · #12', 'C · 普通 · #11'];
+    const screenRows = n && complete ? rows : ['A · 普通 · #12', 'C · 普通 · #11'];
     screenRows.forEach((s, i) => {
       rect(0, 30 + i * 45, w, 36, '#fff', C.line);
       text(s, 10, 40 + i * 45, 12);
