@@ -2,7 +2,7 @@ name: Animation checks
 
 on:
   push:
-    branches: [main, animation-motion-rework]
+    branches: [main]
     paths:
       - '*.html'
       - '*.js'
