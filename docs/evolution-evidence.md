@@ -4,12 +4,12 @@
 
 ## 版本
 
-| 对照对象 | 范围 |
-|---|---|
-| `_11111` | 旧版，已经有 CPU 停车、屏幕驱动、IRQ、可写 IROM 和整包邮箱。 |
-| `20261026_cpu_model_retrained` | 当前选用的硬件候选；冻结构建 `model_integration_retrained_001`。 |
-| `versions/20261027_screening_v3` | 当前筛查 C 工程，保留新版停车轨迹确认，增加刑侦场景和坐标交互。 |
-| `parking_screening_fixed_v2.HMI` | 修复后的屏幕工程，用户确认官方编辑器可打开、编译。 |
+| 对照对象                         | 范围                                                             |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `_11111`                         | 旧版，已经有 CPU 停车、屏幕驱动、IRQ、可写 IROM 和整包邮箱。     |
+| `20261026_cpu_model_retrained`   | 当前选用的硬件候选；冻结构建 `model_integration_retrained_001`。 |
+| `versions/20261027_screening_v3` | 当前筛查 C 工程，保留新版停车轨迹确认，增加刑侦场景和坐标交互。  |
+| `parking_screening_fixed_v2.HMI` | 修复后的屏幕工程，用户确认官方编辑器可打开、编译。               |
 
 位流 SHA256：`0e55e6617417954a3e367e891bc02dfe6f0bb1019a9c66e1890e0de07d9ba0ca`。
 筛查 v3 为 24,132 字节、BSS 8,896 字节，CPU 100 MHz、程序 RAM 32 KiB；位流内默认固件是另一份程序。下一次 C 编译后的长度可能变化。
@@ -34,9 +34,9 @@
 
 本地核对候选 `candidate.json`、`inputs_sha256.json`、`docs/verification/model_integration_20261026.md`、冻结构建 RTL 和筛查 v3。`char_overlay.sv`、`box_overlay_sync.sv`、`ddr_video_delay_sync.sv` 的冻结文件匹配候选输入清单。
 
-| 当前关键文件 | SHA256 |
-|---|---|
-| `char_overlay.sv` | `b6c557b44a194cb702f415a6a5c61ad28afe75fab170634856b0eed9a75da4ef` |
+| 当前关键文件          | SHA256                                                             |
+| --------------------- | ------------------------------------------------------------------ |
+| `char_overlay.sv`     | `b6c557b44a194cb702f415a6a5c61ad28afe75fab170634856b0eed9a75da4ef` |
 | `box_overlay_sync.sv` | `6c528629144b0191bde499fb75e18b4e0adeb7a582e344a6c6f70152d76cf3ba` |
 
 历史来源：`versions/20261027_latency_comparison/README.md`、`versions/20261026_timing_analysis/README.md`、20261027 HMI 修复记录 `native_hmi_update.py` / `check_native_hmi.py`、v2 清单与用户确认。

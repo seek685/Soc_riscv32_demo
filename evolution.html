@@ -1,34 +1,97 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="用可暂停、逐步播放的动画，对照车牌识别 SoC 的历史问题、RTL 修复与 CPU 应用扩展。">
-  <title>问题与改动 · Soc_riscv32 动画实验室</title>
-  <link rel="stylesheet" href="evolution.css">
-  <script defer src="evolution-models.js"></script>
-  <script defer src="evolution.js"></script>
-</head>
-<body>
-  <header class="site-header"><a class="brand" href="index.html"><span class="brand-icon">S</span>SoC 动画实验室</a><span class="header-note">问题与改动 / 2026.10</span><a class="repo-link" href="https://github.com/seek685/Soc_riscv32_demo">GitHub ↗</a></header>
-  <div class="workspace">
-    <aside class="sidebar" aria-label="动画主题"><a class="back" href="index.html">← 全部动画</a><p class="eyebrow">从现象到机制</p><nav id="topic-nav"></nav><p class="sidebar-foot">13 个对照主题<br>纯静态文件 · 可离线使用</p></aside>
-    <main id="main-content">
-      <div class="topic-heading"><span id="topic-group" class="eyebrow"></span><span id="topic-position" class="topic-position"></span><h1 id="topic-title"></h1><p id="topic-subtitle"></p></div>
-      <section class="player" aria-label="动画播放器">
-        <div class="player-top"><span class="live-dot"></span><span>机制演示</span><span class="timing-note">动画节拍不等于真实硬件时钟</span></div>
-        <div class="canvas-wrap"><canvas id="demo-canvas" role="img" aria-label="动画载入中"></canvas></div>
-        <div class="experiments" id="experiments"></div>
-        <div class="step-caption" aria-live="polite"><span id="step-number"></span><strong id="step-caption"></strong></div>
-        <div class="timeline"><label class="sr-only" for="progress">动画步骤</label><input id="progress" type="range" min="0" max="1" value="0" step="1"><span id="progress-label"></span></div>
-        <div class="controls"><button id="play" class="primary" type="button" aria-pressed="false">播放</button><button id="previous-step" type="button" aria-label="上一步">← 上一步</button><button id="next-step" type="button" aria-label="下一步">下一步 →</button><button id="restart" type="button">重播</button><label class="speed-label" for="speed">速度</label><select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
-      </section>
-      <div class="takeaways"><section class="lesson"><span class="eyebrow">这段动画说明什么</span><p id="lesson"></p></section><section class="scope"><span class="eyebrow">演示与验证范围</span><p id="scope"></p></section></div>
-      <details class="evidence"><summary>查看对应代码与版本依据</summary><p>以下为本次核对的主工程相对位置或历史修复记录。动画是解释模型，不会连接硬件或执行烧录。</p><ul id="source-list"></ul><a href="docs/evolution-evidence.md">完整依据与边界说明 ↗</a></details>
-      <nav class="topic-pager" aria-label="相邻主题"><a id="previous-topic"></a><a id="next-topic"></a></nav>
-      <footer>Soc_riscv32_demo · 真实代码机制的教学演示，不作为实板录像、精确时序仿真或性能验收。</footer>
-    </main>
-  </div>
-  <noscript>请开启 JavaScript 播放动画。各主题的范围和代码依据也可在 <a href="docs/evolution-evidence.md">说明文档</a>中阅读。</noscript>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="用可暂停、逐步播放的动画，对照车牌识别 SoC 的历史问题、RTL 修复与 CPU 应用扩展。"
+    />
+    <title>问题与改动 · Soc_riscv32 动画实验室</title>
+    <link rel="stylesheet" href="evolution.css" />
+    <script defer src="evolution-models.js"></script>
+    <script defer src="evolution.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="index.html"><span class="brand-icon">S</span>SoC 动画实验室</a
+      ><span class="header-note">问题与改动 / 2026.10</span
+      ><a class="repo-link" href="https://github.com/seek685/Soc_riscv32_demo">GitHub ↗</a>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar" aria-label="动画主题">
+        <a class="back" href="index.html">← 全部动画</a>
+        <p class="eyebrow">从现象到机制</p>
+        <nav id="topic-nav"></nav>
+        <p class="sidebar-foot">13 个对照主题<br />纯静态文件 · 可离线使用</p>
+      </aside>
+      <main id="main-content">
+        <div class="topic-heading">
+          <span id="topic-group" class="eyebrow"></span
+          ><span id="topic-position" class="topic-position"></span>
+          <h1 id="topic-title"></h1>
+          <p id="topic-subtitle"></p>
+        </div>
+        <section class="player" aria-label="动画播放器">
+          <div class="player-top">
+            <span class="live-dot"></span><span>机制演示</span
+            ><span class="timing-note">动画节拍不等于真实硬件时钟</span>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="demo-canvas" role="img" aria-label="动画载入中"></canvas>
+          </div>
+          <div class="experiments" id="experiments"></div>
+          <div class="step-caption" aria-live="polite">
+            <span id="step-number"></span><strong id="step-caption"></strong>
+          </div>
+          <div class="timeline">
+            <label class="sr-only" for="progress">动画步骤</label
+            ><input id="progress" type="range" min="0" max="1" value="0" step="1" /><span
+              id="progress-label"
+            ></span>
+          </div>
+          <div class="controls">
+            <button id="play" class="primary" type="button" aria-pressed="false">播放</button
+            ><button id="previous-step" type="button" aria-label="上一步">← 上一步</button
+            ><button id="next-step" type="button" aria-label="下一步">下一步 →</button
+            ><button id="restart" type="button">重播</button
+            ><label class="speed-label" for="speed">速度</label
+            ><select id="speed">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </section>
+        <div class="takeaways">
+          <section class="lesson">
+            <span class="eyebrow">这段动画说明什么</span>
+            <p id="lesson"></p>
+          </section>
+          <section class="scope">
+            <span class="eyebrow">演示与验证范围</span>
+            <p id="scope"></p>
+          </section>
+        </div>
+        <details class="evidence">
+          <summary>查看对应代码与版本依据</summary>
+          <p>
+            以下为本次核对的主工程相对位置或历史修复记录。动画是解释模型，不会连接硬件或执行烧录。
+          </p>
+          <ul id="source-list"></ul>
+          <a href="docs/evolution-evidence.md">完整依据与边界说明 ↗</a>
+        </details>
+        <nav class="topic-pager" aria-label="相邻主题">
+          <a id="previous-topic"></a><a id="next-topic"></a>
+        </nav>
+        <footer>
+          Soc_riscv32_demo · 真实代码机制的教学演示，不作为实板录像、精确时序仿真或性能验收。
+        </footer>
+      </main>
+    </div>
+    <noscript
+      >请开启 JavaScript 播放动画。各主题的范围和代码依据也可在
+      <a href="docs/evolution-evidence.md">说明文档</a>中阅读。</noscript
+    >
+  </body>
 </html>

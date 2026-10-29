@@ -1,43 +1,400 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="20 个 SoC 教学动画：CNN 基础数据流、HDMI 历史问题对照、CPU 边界、刑侦筛查与固件加载。">
-<title>SoC 动画实验室 · 从像素流到可交互系统</title>
-<link rel="stylesheet" href="evolution.css">
-<style>
-.home{max-width:1240px;margin:auto;padding:48px 32px}.hero{display:grid;grid-template-columns:1.3fr 1fr;gap:50px;align-items:center;padding:24px 0 44px}.hero h1{font-size:clamp(32px,4.1vw,52px);line-height:1.25;letter-spacing:-.055em;margin:16px 0}.hero p{font-size:14px;color:var(--muted);max-width:580px;line-height:1.9}.hero-actions{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap}.hero-actions a{display:inline-block;padding:10px 17px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:12px}.hero-actions .start{background:var(--teal);color:white;border-color:var(--teal)}.mini-map{padding:26px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:0 12px 35px #173b350b}.map-label{font-size:10px;color:var(--muted);letter-spacing:.07em}.map-line{display:flex;gap:7px;align-items:center;margin:13px 0}.map-line span{flex:1;background:#edf4f1;border:1px solid #d6e6de;border-radius:7px;text-align:center;padding:11px 2px;font-size:11px}.map-line b{font-size:12px;color:var(--muted)}.map-line .cpu{background:#e0f2ef;color:var(--teal);border-color:#add6ce}.map-note{border-top:1px solid var(--line);padding-top:15px;margin-top:16px;font-size:11px;color:var(--muted)}.section-top{display:flex;align-items:baseline;gap:16px;margin:30px 0 17px}.section-top h2{font-size:21px;margin:0;letter-spacing:-.025em}.section-top span{color:var(--muted);font-size:12px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.card{display:flex;flex-direction:column;min-height:155px;padding:21px;border:1px solid var(--line);border-radius:13px;background:white;color:var(--ink);transition:border-color .15s,transform .15s}.card:hover{border-color:#76b6a8;transform:translateY(-2px);text-decoration:none}.card .card-top{display:flex;justify-content:space-between;align-items:center}.card .number{font-size:11px;font-weight:750;color:var(--teal);font-variant-numeric:tabular-nums}.card .kind{font-size:10px;color:var(--muted);background:#f0f4f1;padding:2px 7px;border-radius:5px}.card h3{font-size:15px;line-height:1.5;margin:12px 0 7px}.card p{font-size:11px;color:var(--muted);line-height:1.8;margin:0}.card .go{margin-top:auto;padding-top:13px;font-size:11px;color:var(--teal)}.notice{padding:15px 19px;background:#edf4ef;border:1px solid #d2e2d8;border-radius:10px;color:#4c685d;font-size:12px;line-height:1.8}.legacy .card{min-height:150px}.legacy .card .number{color:#68849a}.home-footer{display:flex;justify-content:space-between;gap:20px;font-size:11px}.home-footer a{white-space:nowrap}
-@media(max-width:900px){.hero{gap:24px;grid-template-columns:1fr}.mini-map{max-width:650px}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.home{padding:28px 22px}.hero h1{font-size:38px}}@media(max-width:540px){.home{padding:24px 16px}.hero{padding-top:8px;padding-bottom:18px;gap:23px}.hero h1{font-size:35px}.hero p{font-size:12px}.hero-actions a{font-size:11px;padding:10px 13px}.mini-map{padding:18px}.map-line span{font-size:10px}.cards{grid-template-columns:1fr;gap:10px}.card{min-height:130px;padding:18px}.card h3{font-size:15px;margin-top:9px}.section-top{display:block}.section-top span{display:block;margin-top:5px}.home-footer{display:block}.home-footer a{display:inline-block;margin-top:10px}}
-</style>
-</head>
-<body>
-<header class="site-header"><a class="brand" href="index.html"><span class="brand-icon">S</span>SoC 动画实验室</a><span class="header-note">Soc_riscv32 · 架构与改动可视化</span><a class="repo-link" href="https://github.com/seek685/Soc_riscv32_demo">GitHub ↗</a></header>
-<main class="home">
-<section class="hero"><div><span class="eyebrow">看见数据怎样流动，也看见问题怎样发生</span><h1>从像素流，<br>到可交互系统。</h1><p>把 HDMI 画框、字符发布、CPU 确认和串口屏交互拆成可以暂停观察的动画。旧版行为与当前机制并排展示，每一步都有对应说明与代码依据。</p><div class="hero-actions"><a class="start" href="#comparisons">查看 13 个问题对照 ↓</a><a href="#fundamentals">学习 7 个基础机制</a></div></div><div class="mini-map" aria-label="硬件识别和 CPU 应用是两条分支"><span class="map-label">硬件持续运行 · CPU 消费完整结果</span><div class="map-line"><span>YOLO 检测</span><b>→</b><span>裁剪 / LPR</span><b>→</b><span>HDMI 画框叠字</span></div><div class="map-line"><span>完整车牌结果</span><b>→</b><span class="cpu">CPU 确认 / 匹配</span><b>→</b><span class="cpu">淘晶驰交互</span></div><div class="map-note">CPU 尚未接管检测框后处理、CTC 或 HDMI 字符发布。新增刑侦应用复用现有硬件识别链。</div></div></section>
-<section id="comparisons"><div class="section-top"><h2>问题与改动对照</h2><span>暂停 · 单步 · 拖动进度 · 调节参数</span></div><div class="cards" id="comparison-cards"></div></section>
-<section id="fundamentals" class="legacy"><div class="section-top"><h2>基础数据流动画</h2><span>保留原有 7 个单文件演示</span></div><p class="notice">这些基础动画采用早期配置与简化网格，适合学习机制。当前版本的元数据、裁剪余量、有效字符范围、7/8 位支持等，以新增对照和代码依据为准；补齐通道不等于有效字符类别。</p><div class="cards">
-<a class="card" href="pipeline.html"><span class="number">基础 01</span><h3>CNN 层间流水</h3><p>行缓存、PE 阵列、权重 ROM 与同时工作的层。</p><span class="go">播放基础动画 →</span></a>
-<a class="card" href="line_buffer.html"><span class="number">基础 02</span><h3>滑动窗口与缓存</h3><p>3×3 数据复用和上游读取次数。</p><span class="go">播放基础动画 →</span></a>
-<a class="card" href="anim3_yolo_postprocess.html"><span class="number">基础 03</span><h3>YOLO 检测头后处理</h3><p>极值通道、sigmoid LUT、阈值与输出检测包。</p><span class="go">播放基础动画 →</span></a>
-<a class="card" href="anim4_crop_resize.html"><span class="number">基础 04</span><h3>坐标还原与裁剪</h3><p>LTRB 解码、边界限制和双线性采样。</p><span class="go">播放基础动画 →</span></a>
-<a class="card" href="anim5_crop_fifo.html"><span class="number">基础 05</span><h3>跨时钟裁剪传送带</h3><p>逐框 FIFO、读端轮转与排空用黑帧。</p><span class="go">播放基础动画 →</span></a>
-<a class="card" href="anim6_lprnet_ctc.html"><span class="number">基础 06</span><h3>LPRNet 后处理</h3><p>空间求和、argmax 与 CTC 去空白、去相邻重复。</p><span class="go">播放基础动画 →</span></a>
-<a class="card" href="anim7_mailbox_cdc.html"><span class="number">基础 07</span><h3>结果邮箱握手</h3><p>快照冻结、request / ack 跨时钟与 POP。</p><span class="go">播放基础动画 →</span></a>
-</div></section>
-<footer class="home-footer"><span>教学示意，不作为实板录像、精确时序仿真或性能验收。完整目录可离线打开。</span><a href="docs/evolution-evidence.md">代码依据与验证范围 ↗</a></footer>
-</main>
-<script src="evolution-models.js"></script><script>
-const cards=document.getElementById('comparison-cards');
-for(const [index,topic] of SoCDemoModels.topics.entries()){
- const a=document.createElement('a');a.className='card';a.href='evolution.html?topic='+topic.id;
- const top=document.createElement('div');top.className='card-top';
- const num=document.createElement('span');num.className='number';num.textContent=String(index+1).padStart(2,'0');
- const kind=document.createElement('span');kind.className='kind';kind.textContent=topic.group;top.append(num,kind);
- const heading=document.createElement('h3');heading.textContent=topic.title;
- const sub=document.createElement('p');sub.textContent=topic.subtitle;
- const go=document.createElement('span');go.className='go';go.textContent='打开对照动画 →';
- a.append(top,heading,sub,go);cards.append(a);
-}
-</script>
-<noscript>新增对照动画需要 JavaScript。可先阅读 <a href="docs/evolution-evidence.md">全部主题的代码依据</a>。</noscript>
-</body></html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="20 个 SoC 教学动画：CNN 基础数据流、HDMI 历史问题对照、CPU 边界、刑侦筛查与固件加载。"
+    />
+    <title>SoC 动画实验室 · 从像素流到可交互系统</title>
+    <link rel="stylesheet" href="evolution.css" />
+    <style>
+      .home {
+        max-width: 1240px;
+        margin: auto;
+        padding: 48px 32px;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 50px;
+        align-items: center;
+        padding: 24px 0 44px;
+      }
+      .hero h1 {
+        font-size: clamp(32px, 4.1vw, 52px);
+        line-height: 1.25;
+        letter-spacing: -0.055em;
+        margin: 16px 0;
+      }
+      .hero p {
+        font-size: 14px;
+        color: var(--muted);
+        max-width: 580px;
+        line-height: 1.9;
+      }
+      .hero-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+      }
+      .hero-actions a {
+        display: inline-block;
+        padding: 10px 17px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        font-size: 12px;
+      }
+      .hero-actions .start {
+        background: var(--teal);
+        color: white;
+        border-color: var(--teal);
+      }
+      .mini-map {
+        padding: 26px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: #fff;
+        box-shadow: 0 12px 35px #173b350b;
+      }
+      .map-label {
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.07em;
+      }
+      .map-line {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin: 13px 0;
+      }
+      .map-line span {
+        flex: 1;
+        background: #edf4f1;
+        border: 1px solid #d6e6de;
+        border-radius: 7px;
+        text-align: center;
+        padding: 11px 2px;
+        font-size: 11px;
+      }
+      .map-line b {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .map-line .cpu {
+        background: #e0f2ef;
+        color: var(--teal);
+        border-color: #add6ce;
+      }
+      .map-note {
+        border-top: 1px solid var(--line);
+        padding-top: 15px;
+        margin-top: 16px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .section-top {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin: 30px 0 17px;
+      }
+      .section-top h2 {
+        font-size: 21px;
+        margin: 0;
+        letter-spacing: -0.025em;
+      }
+      .section-top span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 13px;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        min-height: 155px;
+        padding: 21px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: white;
+        color: var(--ink);
+        transition:
+          border-color 0.15s,
+          transform 0.15s;
+      }
+      .card:hover {
+        border-color: #76b6a8;
+        transform: translateY(-2px);
+        text-decoration: none;
+      }
+      .card .card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .card .number {
+        font-size: 11px;
+        font-weight: 750;
+        color: var(--teal);
+        font-variant-numeric: tabular-nums;
+      }
+      .card .kind {
+        font-size: 10px;
+        color: var(--muted);
+        background: #f0f4f1;
+        padding: 2px 7px;
+        border-radius: 5px;
+      }
+      .card h3 {
+        font-size: 15px;
+        line-height: 1.5;
+        margin: 12px 0 7px;
+      }
+      .card p {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.8;
+        margin: 0;
+      }
+      .card .go {
+        margin-top: auto;
+        padding-top: 13px;
+        font-size: 11px;
+        color: var(--teal);
+      }
+      .notice {
+        padding: 15px 19px;
+        background: #edf4ef;
+        border: 1px solid #d2e2d8;
+        border-radius: 10px;
+        color: #4c685d;
+        font-size: 12px;
+        line-height: 1.8;
+      }
+      .legacy .card {
+        min-height: 150px;
+      }
+      .legacy .card .number {
+        color: #68849a;
+      }
+      .home-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 11px;
+      }
+      .home-footer a {
+        white-space: nowrap;
+      }
+      @media (max-width: 900px) {
+        .hero {
+          gap: 24px;
+          grid-template-columns: 1fr;
+        }
+        .mini-map {
+          max-width: 650px;
+        }
+        .cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .home {
+          padding: 28px 22px;
+        }
+        .hero h1 {
+          font-size: 38px;
+        }
+      }
+      @media (max-width: 540px) {
+        .home {
+          padding: 24px 16px;
+        }
+        .hero {
+          padding-top: 8px;
+          padding-bottom: 18px;
+          gap: 23px;
+        }
+        .hero h1 {
+          font-size: 35px;
+        }
+        .hero p {
+          font-size: 12px;
+        }
+        .hero-actions a {
+          font-size: 11px;
+          padding: 10px 13px;
+        }
+        .mini-map {
+          padding: 18px;
+        }
+        .map-line span {
+          font-size: 10px;
+        }
+        .cards {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .card {
+          min-height: 130px;
+          padding: 18px;
+        }
+        .card h3 {
+          font-size: 15px;
+          margin-top: 9px;
+        }
+        .section-top {
+          display: block;
+        }
+        .section-top span {
+          display: block;
+          margin-top: 5px;
+        }
+        .home-footer {
+          display: block;
+        }
+        .home-footer a {
+          display: inline-block;
+          margin-top: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="index.html"><span class="brand-icon">S</span>SoC 动画实验室</a
+      ><span class="header-note">Soc_riscv32 · 架构与改动可视化</span
+      ><a class="repo-link" href="https://github.com/seek685/Soc_riscv32_demo">GitHub ↗</a>
+    </header>
+    <main class="home">
+      <section class="hero">
+        <div>
+          <span class="eyebrow">看见数据怎样流动，也看见问题怎样发生</span>
+          <h1>从像素流，<br />到可交互系统。</h1>
+          <p>
+            把 HDMI 画框、字符发布、CPU
+            确认和串口屏交互拆成可以暂停观察的动画。旧版行为与当前机制并排展示，每一步都有对应说明与代码依据。
+          </p>
+          <div class="hero-actions">
+            <a class="start" href="#comparisons">查看 13 个问题对照 ↓</a
+            ><a href="#fundamentals">学习 7 个基础机制</a>
+          </div>
+        </div>
+        <div class="mini-map" aria-label="硬件识别和 CPU 应用是两条分支">
+          <span class="map-label">硬件持续运行 · CPU 消费完整结果</span>
+          <div class="map-line">
+            <span>YOLO 检测</span><b>→</b><span>裁剪 / LPR</span><b>→</b><span>HDMI 画框叠字</span>
+          </div>
+          <div class="map-line">
+            <span>完整车牌结果</span><b>→</b><span class="cpu">CPU 确认 / 匹配</span><b>→</b
+            ><span class="cpu">淘晶驰交互</span>
+          </div>
+          <div class="map-note">
+            CPU 尚未接管检测框后处理、CTC 或 HDMI 字符发布。新增刑侦应用复用现有硬件识别链。
+          </div>
+        </div>
+      </section>
+      <section id="comparisons">
+        <div class="section-top">
+          <h2>问题与改动对照</h2>
+          <span>暂停 · 单步 · 拖动进度 · 调节参数</span>
+        </div>
+        <div class="cards" id="comparison-cards"></div>
+      </section>
+      <section id="fundamentals" class="legacy">
+        <div class="section-top">
+          <h2>基础数据流动画</h2>
+          <span>保留原有 7 个单文件演示</span>
+        </div>
+        <p class="notice">
+          这些基础动画采用早期配置与简化网格，适合学习机制。当前版本的元数据、裁剪余量、有效字符范围、7/8
+          位支持等，以新增对照和代码依据为准；补齐通道不等于有效字符类别。
+        </p>
+        <div class="cards">
+          <a class="card" href="pipeline.html"
+            ><span class="number">基础 01</span>
+            <h3>CNN 层间流水</h3>
+            <p>行缓存、PE 阵列、权重 ROM 与同时工作的层。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+          <a class="card" href="line_buffer.html"
+            ><span class="number">基础 02</span>
+            <h3>滑动窗口与缓存</h3>
+            <p>3×3 数据复用和上游读取次数。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+          <a class="card" href="anim3_yolo_postprocess.html"
+            ><span class="number">基础 03</span>
+            <h3>YOLO 检测头后处理</h3>
+            <p>极值通道、sigmoid LUT、阈值与输出检测包。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+          <a class="card" href="anim4_crop_resize.html"
+            ><span class="number">基础 04</span>
+            <h3>坐标还原与裁剪</h3>
+            <p>LTRB 解码、边界限制和双线性采样。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+          <a class="card" href="anim5_crop_fifo.html"
+            ><span class="number">基础 05</span>
+            <h3>跨时钟裁剪传送带</h3>
+            <p>逐框 FIFO、读端轮转与排空用黑帧。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+          <a class="card" href="anim6_lprnet_ctc.html"
+            ><span class="number">基础 06</span>
+            <h3>LPRNet 后处理</h3>
+            <p>空间求和、argmax 与 CTC 去空白、去相邻重复。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+          <a class="card" href="anim7_mailbox_cdc.html"
+            ><span class="number">基础 07</span>
+            <h3>结果邮箱握手</h3>
+            <p>快照冻结、request / ack 跨时钟与 POP。</p>
+            <span class="go">播放基础动画 →</span></a
+          >
+        </div>
+      </section>
+      <footer class="home-footer">
+        <span>教学示意，不作为实板录像、精确时序仿真或性能验收。完整目录可离线打开。</span
+        ><a href="docs/evolution-evidence.md">代码依据与验证范围 ↗</a>
+      </footer>
+    </main>
+    <script src="evolution-models.js"></script>
+    <script>
+      const cards = document.getElementById('comparison-cards');
+      for (const [index, topic] of SoCDemoModels.topics.entries()) {
+        const a = document.createElement('a');
+        a.className = 'card';
+        a.href = 'evolution.html?topic=' + topic.id;
+        const top = document.createElement('div');
+        top.className = 'card-top';
+        const num = document.createElement('span');
+        num.className = 'number';
+        num.textContent = String(index + 1).padStart(2, '0');
+        const kind = document.createElement('span');
+        kind.className = 'kind';
+        kind.textContent = topic.group;
+        top.append(num, kind);
+        const heading = document.createElement('h3');
+        heading.textContent = topic.title;
+        const sub = document.createElement('p');
+        sub.textContent = topic.subtitle;
+        const go = document.createElement('span');
+        go.className = 'go';
+        go.textContent = '打开对照动画 →';
+        a.append(top, heading, sub, go);
+        cards.append(a);
+      }
+    </script>
+    <noscript
+      >新增对照动画需要 JavaScript。可先阅读
+      <a href="docs/evolution-evidence.md">全部主题的代码依据</a>。</noscript
+    >
+  </body>
+</html>

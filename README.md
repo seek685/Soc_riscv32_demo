@@ -6,21 +6,21 @@
 
 播放器支持暂停、重播、单步、进度拖动、0.5×/1×/2×、方向键与空格，移动端上下对照。“减少动态效果”系统偏好下默认暂停。裁剪页可调框宽，加载页可模拟 CRC 错误，触摸页可显示 C 坐标区域，命令页可切换终端。
 
-| 对照主题 | 入口 |
-|---|---|
-| CPU 职责边界、已有能力与新增应用 | [播放](evolution.html?topic=boundary) |
-| HDMI 框与底图错帧 | [播放](evolution.html?topic=frame) |
-| 整牌发布、晚到结果与旧字符清理 | [播放](evolution.html?topic=text) |
-| 比例裁剪余量与两行偏差 | [播放](evolution.html?topic=crop) |
-| 多目标独立确认、重复/旧帧过滤 | [播放](evolution.html?topic=tracks) |
-| 完整结果邮箱与元数据 | [播放](evolution.html?topic=mailbox) |
-| 双场景、独立时钟与记录 | [播放](evolution.html?topic=scenes) |
-| 无 HMI 热区的坐标交互 | [播放](evolution.html?topic=touch) |
-| 刷新/排序时的删除保护 | [播放](evolution.html?topic=delete) |
-| FPGA / C / 屏幕下载、CRC 与断电 | [播放](evolution.html?topic=loader) |
-| CMD / PowerShell、--help 与参数 | [播放](evolution.html?topic=commands) |
-| HMI 原生目录及 CRC 修复 | [播放](evolution.html?topic=container) |
-| 网络计算与显示等待的时间口径 | [播放](evolution.html?topic=latency) |
+| 对照主题                         | 入口                                   |
+| -------------------------------- | -------------------------------------- |
+| CPU 职责边界、已有能力与新增应用 | [播放](evolution.html?topic=boundary)  |
+| HDMI 框与底图错帧                | [播放](evolution.html?topic=frame)     |
+| 整牌发布、晚到结果与旧字符清理   | [播放](evolution.html?topic=text)      |
+| 比例裁剪余量与两行偏差           | [播放](evolution.html?topic=crop)      |
+| 多目标独立确认、重复/旧帧过滤    | [播放](evolution.html?topic=tracks)    |
+| 完整结果邮箱与元数据             | [播放](evolution.html?topic=mailbox)   |
+| 双场景、独立时钟与记录           | [播放](evolution.html?topic=scenes)    |
+| 无 HMI 热区的坐标交互            | [播放](evolution.html?topic=touch)     |
+| 刷新/排序时的删除保护            | [播放](evolution.html?topic=delete)    |
+| FPGA / C / 屏幕下载、CRC 与断电  | [播放](evolution.html?topic=loader)    |
+| CMD / PowerShell、--help 与参数  | [播放](evolution.html?topic=commands)  |
+| HMI 原生目录及 CRC 修复          | [播放](evolution.html?topic=container) |
+| 网络计算与显示等待的时间口径     | [播放](evolution.html?topic=latency)   |
 
 动画按本地 `_11111`、`_reconsitution` 冻结构建及筛查 v3 核对。CPU 尚未接管 YOLO 框后处理、CTC 或 HDMI 画框/叠字。筛查连续结果确认不等于逐图片计数。原有基础动画保留早期配置并明确说明版本范围。
 
