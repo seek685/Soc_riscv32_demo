@@ -49,6 +49,28 @@ const server = http.createServer((req, res) => {
       viewport: { width: 1440, height: 1050 },
       reducedMotion: 'reduce',
     });
+    await page.addInitScript(() => {
+      window.__canvasTextOverflow = [];
+      const original = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (value, x, y, ...args) {
+        if (this.canvas.id === 'demo-canvas') {
+          const transform = this.getTransform();
+          const point = new DOMPoint(x, y).matrixTransform(transform);
+          const width = this.measureText(String(value)).width * transform.a;
+          const height = Number((this.font.match(/([\d.]+)px/) || [0, 0])[1]) * transform.d;
+          if (
+            point.x < -2 ||
+            point.y < -2 ||
+            point.x + width > this.canvas.width + 2 ||
+            point.y + height > this.canvas.height + 2
+          ) {
+            if (window.__canvasTextOverflow.length < 10)
+              window.__canvasTextOverflow.push({ text: String(value), x: point.x, y: point.y });
+          }
+        }
+        return original.call(this, value, x, y, ...args);
+      };
+    });
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('response', (r) => {
       if (r.status() >= 400 && !r.url().endsWith('/favicon.ico'))
@@ -67,6 +89,10 @@ const server = http.createServer((req, res) => {
           el.dispatchEvent(new Event('input', { bubbles: true }));
         }, step);
         await page.waitForFunction((value) => Number(document.body.dataset.step) === value, step);
+        await page.evaluate(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        );
         assert.equal(await page.locator('#step-caption').textContent(), topic.steps[step]);
         states++;
       }
@@ -74,6 +100,11 @@ const server = http.createServer((req, res) => {
         () => document.documentElement.scrollWidth > innerWidth + 1,
       );
       assert.equal(overflow, false, topic.id + ' desktop overflow');
+      assert.deepEqual(
+        await page.evaluate(() => window.__canvasTextOverflow),
+        [],
+        topic.id + ' canvas text clipping',
+      );
       await page.screenshot({
         path: path.join(artifacts, topic.id + '-desktop.png'),
         fullPage: true,

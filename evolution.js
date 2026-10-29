@@ -130,8 +130,8 @@
     const stacked = cw < 740,
       pad = 16,
       gap = 16,
-      ph = 428,
       pw = stacked ? cw - 32 : (cw - 48) / 2;
+    const ph = topic.id === 'touch' ? Math.max(428, Math.ceil((pw - 30) * 0.6) + 205) : 428;
     ch = stacked ? ph * 2 + 48 : ph + 32;
     canvas.style.height = ch + 'px';
     const dpr = Math.min(devicePixelRatio || 1, 2);
