@@ -33,6 +33,7 @@ try {
     assert.equal(await page.locator('#progress').inputValue(), paused, `${topic} did not pause`);
     await page.locator('#reset').click();
     assert.equal(await page.locator('#progress').inputValue(), '0');
+    if (['conv','heads','classify'].includes(topic)) await page.screenshot({ path: `test-artifacts/desktop-${topic}.png`, fullPage: true });
     checks += 4;
   }
   await page.locator('.topic-bar [data-topic="box"]').click();
@@ -47,13 +48,18 @@ try {
   await page.screenshot({ path: 'test-artifacts/desktop-box.png', fullPage: true });
   await page.locator('.topic-bar [data-topic="classify"]').click();
   await slider(page, 'threshold', 186);
+  assert.equal(await page.locator('#class-decision').textContent(), '通过'); checks++;
   const accepted = await page.locator('#visual').evaluate(el => el.toDataURL());
   await slider(page, 'threshold', 187);
+  assert.equal(await page.locator('#class-decision').textContent(), '未通过'); checks++;
   assert.notEqual(await page.locator('#visual').evaluate(el => el.toDataURL()), accepted); checks++;
   assert.equal(await page.locator('#class-result').textContent(), '2 · 186/255'); checks++;
   await page.locator('.topic-bar [data-topic="recognition"]').click();
   await slider(page, 'progress', 100);
   assert.equal(await page.locator('#lpr-stage').textContent(), 'CTC 解码完成'); checks++;
+  assert.equal(await page.locator('#ctc-result').textContent(), 'AAB'); checks++;
+  await page.locator('#ctc').selectOption('1');
+  assert.equal(await page.locator('#ctc-result').textContent(), 'ABC'); checks++;
   await page.locator('.topic-bar [data-topic="postprocess"]').click();
   await slider(page, 'overlap', 0);
   assert.equal(await page.locator('#iou-result').textContent(), '1.000'); checks++;
