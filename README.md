@@ -1,53 +1,44 @@
-# Soc_riscv32_demo
+# CNN Explainer · 从像素到位置
 
-车牌识别 SoC 的交互式教学动画：**7 个基础数据流动画 + 13 个问题与改动对照动画**。
+[打开交互网站](https://seek685.github.io/Soc_riscv32_demo/)
 
-入口：[GitHub Pages](https://seek685.github.io/Soc_riscv32_demo/) · [问题与改动播放器](https://seek685.github.io/Soc_riscv32_demo/evolution.html?topic=boundary)
+围绕 `D:/_latest` 工程的真实卷积网络，重新制作的中文交互解释器。总览展示输入、共享卷积、分类与框回归两个分支；点击特征图展开计算，文字解释紧跟动画下方。演示不展示项目源代码。
 
-13 个对照主题用连续运动讲述过程：车辆和画框怎样错开、结果怎样进入各自的计票区、手指操作怎样变成屏幕交互。两边使用相同输入；代码与版本依据可按需展开，无需阅读代码也可观看。
+交互覆盖：卷积逐项乘加、偏置、ReLU、定点量化、步长与池化对照、空间地址与通道、1×1 输出头、分类查表与阈值、LTRB 坐标解码、监督训练示意、在线重叠去重、裁剪与 LPR/CTC，以及滑动窗口和层间流水。支持播放、暂停、单步、进度拖动、速度调节、参数修改和手机布局。
 
-播放器支持循环播放、暂停、重播、单步、连续拖动进度、0.5×/1×/2×、方向键与空格，移动端上下对照。“减少动态效果”系统偏好下默认暂停。裁剪页可调框宽，加载页可模拟 CRC 错误，触摸页可显示点击范围，命令页可切换终端。
+## 与普通分类 CNN 的区别
 
-| 对照主题                         | 入口                                   |
-| -------------------------------- | -------------------------------------- |
-| CPU 职责边界、已有能力与新增应用 | [播放](evolution.html?topic=boundary)  |
-| HDMI 框与底图错帧                | [播放](evolution.html?topic=frame)     |
-| 整牌发布、晚到结果与旧字符清理   | [播放](evolution.html?topic=text)      |
-| 比例裁剪余量与两行偏差           | [播放](evolution.html?topic=crop)      |
-| 多目标独立确认、重复/旧帧过滤    | [播放](evolution.html?topic=tracks)    |
-| 完整结果邮箱与元数据             | [播放](evolution.html?topic=mailbox)   |
-| 双场景、独立时钟与记录           | [播放](evolution.html?topic=scenes)    |
-| 无 HMI 热区的坐标交互            | [播放](evolution.html?topic=touch)     |
-| 刷新/排序时的删除保护            | [播放](evolution.html?topic=delete)    |
-| FPGA / C / 屏幕下载、CRC 与断电  | [播放](evolution.html?topic=loader)    |
-| CMD / PowerShell、--help 与参数  | [播放](evolution.html?topic=commands)  |
-| HMI 原生目录及 CRC 修复          | [播放](evolution.html?topic=container) |
-| 网络计算与显示等待的时间口径     | [播放](evolution.html?topic=latency)   |
+- 检测器 L0–L3 用 stride 2 卷积缩小图像，没有池化；L4 后分为两支，均保持 80×45 网格。
+- 框头有 4 个有效距离输出；分类头有 5 个有效类别，两头硬件均补齐为 16 通道。
+- 每个网格参考点为 `(16gx+8,16gy+8)`，用 `2×LTRB` 解码四条边；参考点不一定是框中心。
+- 分类按 signed 9 位取最大，再查真实 sigmoid ROM；正式阈值为 `>=64`。没有全连接和跨类别 Softmax。
+- 在线六槽同类去重使用 IoU ≥ 0.5，替换还受实时条件限制，并非全局排序 NMS。
+- 裁剪到 80×20 后进入 LPRNet（此网络有池化），20 个时间步经过贪心 CTC 得到字符。
 
-动画按本地 `_11111`、`_reconsitution` 冻结构建及筛查 v3 核对。CPU 尚未接管 YOLO 框后处理、CTC 或 HDMI 画框/叠字。筛查连续结果确认不等于逐图片计数。原有基础动画保留早期配置并明确说明版本范围。
+[详细模型依据与源码位置](docs/model-evidence.md) 记录了核对范围、层参数、解码公式与训练来源。类别中文语义未找到可靠映射，因此使用编号 0–4。
 
-这些动画不会连接串口或执行烧录。教学模型、历史验证和板测是不同证据，详见[依据说明](docs/evolution-evidence.md)。
+## 教学边界
 
-## 离线使用
+图像是程序绘制的合成场景，热力图是示意响应；小矩阵、头输出和训练进度可调，**没有加载完整训练权重，也不执行真实图片识别**。网络拓扑、尺寸、位宽、量化、sigmoid ROM、LTRB 和 CTC 规则按工程核对。量化数学忽略有限累加器溢出；去重只演示一次比较，流水不是周期精确仿真。
 
-下载完整仓库，双击 `index.html`。新增播放器使用同目录 HTML/CSS/JavaScript，无 CDN 或运行时依赖；需要保留目录结构。原有 7 个动画仍为单文件 HTML。
+交互组织参考 [Polo Club CNN Explainer](https://poloclub.github.io/cnn-explainer/)，独立编写页面、绘图与交互，未复制其代码和素材。旧演示内容已移除，可通过 Git 历史找回。
 
-## 本地验证
+## 本地运行与检查
 
-需要 Node.js：
+需要 Node.js 24+。运行时不依赖 CDN 或第三方包。
+
+```sh
+npm start
+```
+
+打开 `http://127.0.0.1:4173`。使用 ES modules，不能直接双击 HTML 通过 `file://` 加载。
 
 ```sh
 npm test
 npm run check
-```
-
-真实浏览器检查：
-
-```sh
-npm install
+npm ci --ignore-scripts
+npx playwright install chromium
 npm run test:browser
 ```
 
-优先使用本机 Chrome / Edge，也可通过 `BROWSER_PATH` 指定路径。若使用 Playwright 自带 Chromium，先执行 `npx playwright install chromium`。截图、录像与结果在忽略提交的 `test-artifacts/`。浏览器测试覆盖全部新主题及步骤、同一幕内的画面变化、播放与暂停、交互、390px 移动端、离线 file 模式和 7 个旧页面加载。
-
-静态 GitHub Pages，无构建步骤。
+数学测试与静态检查无需安装依赖。浏览器回归检查覆盖全部课程、播放/暂停、数值联动、阈值、网格键盘操作、桌面/390px 手机布局，截图保存到 `test-artifacts/`。GitHub Actions 自动运行全部检查。GitHub Pages 从 main 分支根目录发布，无构建步骤。

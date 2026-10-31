@@ -1,46 +1,29 @@
-name: Animation checks
-
+name: CNN explainer checks
 on:
   push:
     branches: [main]
-    paths:
-      - '*.html'
-      - '*.js'
-      - '*.css'
-      - 'package*.json'
-      - 'tests/**'
-      - 'scripts/**'
-      - '.github/workflows/demo-checks.yml'
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  check:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Install development dependencies
-        run: npm ci --ignore-scripts
-      - name: Model assertions
-        run: npm test
-      - name: Static links and JavaScript syntax
-        run: npm run check
-      - name: Install headless Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Install Chinese fonts for readable screenshots
-        run: sudo apt-get install -y fonts-noto-cjk
-      - name: Desktop, mobile, offline and legacy browser checks
-        run: npm run test:browser
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test && npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y fonts-noto-cjk
+      - run: npm run test:browser
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: animation-browser-evidence
+          name: cnn-explainer-visual-checks
           path: test-artifacts/
           retention-days: 14

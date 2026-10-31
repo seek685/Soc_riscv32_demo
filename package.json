@@ -1,14 +1,14 @@
 {
-  "name": "soc-riscv32-demo",
-  "version": "1.1.0",
+  "name": "soc-riscv32-cnn-explainer",
+  "version": "2.0.0",
   "private": true,
-  "description": "Offline educational animations for the plate-recognition FPGA SoC",
+  "type": "module",
   "scripts": {
-    "test": "node tests/models.test.cjs",
-    "check": "node scripts/check-site.cjs",
-    "test:browser": "node scripts/browser-smoke.cjs"
+    "start": "node scripts/serve.mjs",
+    "test": "node --test --test-isolation=none tests/*.test.mjs",
+    "check": "node --check app.js && node --check model.js && node --check lessons.js && node scripts/check-site.mjs",
+    "test:browser": "node scripts/browser-test.mjs"
   },
-  "devDependencies": {
-    "playwright": "1.57.0"
-  }
+  "engines": { "node": ">=24" },
+  "devDependencies": { "playwright": "1.57.0" }
 }
