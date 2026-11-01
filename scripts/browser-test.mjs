@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { serve } from './serve.mjs';
 import { checkExplorer } from './explorer-browser-checks.mjs';
+import { checkPredictions } from './predictions-browser-checks.mjs';
 const server = await serve();
 const browser = await chromium.launch(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {});
 await mkdir('test-artifacts', { recursive: true });
@@ -19,6 +20,7 @@ try {
   assert.equal(await page.locator('.node').count(), 12); checks++;
   await page.screenshot({ path: 'test-artifacts/desktop-overview.png', fullPage: true });
   checks += await checkExplorer(page);
+  checks += await checkPredictions(page);
   const topics = await page.locator('.topic-bar button').evaluateAll(nodes => nodes.map(n => n.dataset.topic));
   for (const topic of topics) {
     await page.locator(`.topic-bar [data-topic="${topic}"]`).click();

@@ -1,6 +1,7 @@
 import { layers, conv2d, relu, dot, decodeBox, iou, quantize, sigmoidLookup } from './model.js';
 import { lessons } from './lessons.js';
 import { createNetworkExplorer } from './network-explorer.js';
+import { predictionControls, bindPredictionControls, drawPredictions } from './predictions.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -9,8 +10,8 @@ const ctx = canvas.getContext('2d');
 canvas.width = 1800; canvas.height = 1020;
 ctx.scale(2, 2);
 const C = {ink:'#36434b',muted:'#7b888e',line:'#d8e1e5',coral:'#d4745e',blue:'#629bb5',green:'#538d80',light:'#f0f4f6'};
-const topicKeys = ['overview','conv','stride','features','heads','classify','box','training','postprocess','recognition','hardware'];
-const initial = () => ({topic:'overview',sample:0,layer:0,channel:0,progress:0,playing:false,speed:1,kernel:0,bias:0,activation:true,stride:1,gx:30,gy:20,left:44,top:14,right:52,bottom:16,score:2,threshold:64,head:0,feature:4,weight:2,train:0,quant:false,shift:0,sameClass:true,pool:false,ctc:0,overlap:12});
+const topicKeys = ['overview','conv','stride','features','heads','predictions','classify','box','training','postprocess','recognition','hardware'];
+const initial = () => ({topic:'overview',sample:0,layer:0,channel:0,progress:0,playing:false,speed:1,kernel:0,bias:0,activation:true,stride:1,gx:30,gy:20,left:44,top:14,right:52,bottom:16,score:2,threshold:64,head:0,feature:4,weight:2,train:0,quant:false,shift:0,sameClass:true,pool:false,ctc:0,overlap:12,predictionId:'A',predictionChannel:0,predictionFeature:null,predictionThreshold:64,predictionReplace:true});
 let state = initial();
 let lastTime = 0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -82,7 +83,10 @@ function buildControls(){
  if(s.topic==='postprocess')h='<div class="control-heading">一次同类重叠比较</div>'+range('overlap','候选 B 水平偏移（像素）',0,240,s.overlap)+`<label class="checks"><input id="sameClass" data-key="sameClass" type="checkbox" ${s.sameClass?'checked':''}> 两候选属于同一类别</label>`+metric('交并比 IoU','iou-result')+metric('这一次比较的结论','iou-decision')+'<p class="control-note">工程按到达顺序处理最多六个槽。这里只演示一次重叠判定；替换还要求新分数更高、尚未裁剪、视频未到框顶边，不能只看 IoU。</p>';
  if(s.topic==='recognition')h='<div class="control-heading">从目标框到字符序列</div>'+select('ctc','选择 CTC 教学序列',['A A blank A B B → AAB','A A B B blank C → ABC'],s.ctc)+metric('当前阶段','lpr-stage')+metric('已解码字符','ctc-result')+'<div class="formula">裁剪 / 双线性缩放 80×20×3<br>卷积 + 池化 → 20×5×128<br>76 有效通道（含 blank）<br>5 行求和 → 20 步 argmax<br>合并相邻重复 → 删除 blank</div><p class="control-note">演示只展开其中 6 个时间步。blank 会隔开重复字符，不能先删 blank 再合并。这里没有全连接，也无需显式 Softmax。</p>';
  if(s.topic==='hardware')h='<div class="control-heading">数据经过，窗口跟着走</div>'+metric('当前小图扫描地址','buffer-position')+'<div class="control-note">左侧模拟像素逐行到达；中间保留两行历史，并组出 3×3 窗口；右侧显示不同层处理不同位置的数据。</div><div class="formula">复用重叠像素 → 减少重复读取<br>窗口就绪 → 乘加 → 下一层<br>并行处理 ≠ 改变网络数学</div><p class="control-note">6×8 图与流水节拍均为教学示意，不是板端周期精确仿真。边界零填充与反压会影响真实调度。</p>';
+ if(s.topic==='predictions')h=predictionControls(s);
+ if(['heads','classify','box','postprocess'].includes(s.topic))h+='<button class="wide-button" data-goto="predictions">32 个通道如何变成候选框？→</button>';
  $('#controls').innerHTML=h;
+ if(s.topic==='predictions')bindPredictionControls(state,draw);
  $$('#controls [data-key]').forEach(el=>el.addEventListener('input',()=>{state[el.dataset.key]=el.type==='checkbox'?el.checked:+el.value;const out=$(`#${el.id}-value`);if(out)out.textContent=el.value;draw();if(['gx','gy','channel'].includes(el.id))updateSelected();}));
  $$('#controls [data-goto]').forEach(el=>el.onclick=()=>selectTopic(el.dataset.goto));
  if($('#train-step'))$('#train-step').onclick=()=>{state.train=Math.min(100,state.train+10);$('#train').value=state.train;$('#train-value').textContent=state.train;draw();};
@@ -91,6 +95,8 @@ function write(id,value){const el=$('#'+id);if(el)el.textContent=value;}
 function updateSelected(){$$('.node').forEach(n=>n.classList.toggle('selected',n.dataset.node===String(state.layer)));}
 function selectTopic(topic){if(!topicKeys.includes(topic))topic='overview';state.topic=topic;state.progress=0;state.playing=false;$('#play').textContent='▶ 播放';$('#play').setAttribute('aria-pressed','false');
  $('.playback').hidden=topic==='overview';$('.progress-line').hidden=topic==='overview';$('#frame-label').hidden=topic==='overview';
+ $('#prediction-products').hidden=true;
+ $('.visual-panel').classList.toggle('prediction-visual',topic==='predictions');
  const lesson=lessons[topic];$('#experiment-title').textContent=lesson.title;$('#experiment-kicker').textContent=lesson.kicker;$('#experiment-lead').textContent=lesson.lead;$('#takeaway').innerHTML=lesson.takeaway;$('#reading-subtitle').textContent=lesson.title;$('#explanations').innerHTML=lesson.paragraphs.map((p,i)=>`<article><h3><span style="color:var(--coral);font-family:var(--mono);font-size:11px;margin-right:9px">0${i+1}</span>${p.title}</h3><p>${p.text}</p></article>`).join('');$$('.topic-bar button').forEach(el=>el.classList.toggle('active',el.dataset.topic===topic));buildControls();updateSelected();history.replaceState(null,'','#'+topic);draw();}
 function heading(t,sub=''){text(t,40,32,16,C.ink);if(sub)text(sub,40,58,11,C.muted);}
 function drawOverview(){heading('图像中的“是什么”和“在哪里”，在这里分开回答。');scene(ctx,35,105,320,180);rect(385,128,148,130,'#eef3f6',C.line,6);for(let k=2;k>=0;k--)feature(ctx,401+k*12,143+k*8,95,65,k,4);text('L0 → L4',457,236,14,C.ink,'center','monospace');arrow(359,195,385,195);arrow(535,168,585,125,C.blue);arrow(535,219,585,272,C.coral);rect(588,80,260,92,'#eff5f8',C.line,5);text('分类头 L8 → L9 → L10',608,106,14);text('每个网格：5 个有效类别分数',608,140,12,C.blue);rect(588,230,260,92,'#fff2ec',C.line,5);text('框头 L5 → L6 → L7',608,257,14);text('每个网格：L、T、R、B 四个距离',608,290,12,C.coral);arrow(718,325,718,371,C.coral);rect(353,377,495,63,'#f4f6f5',C.line,5);text('坐标解码 → 框内裁剪 → LPR 字符网络 → CTC',600,408,15,C.ink,'center');text('1280 × 720 × 3',195,312,12,C.muted,'center','monospace');text('80 × 45 × 64',457,285,12,C.muted,'center','monospace');
@@ -147,7 +153,7 @@ function animateDetail(){
   else {const col=Math.floor((p-.15)/.15*20);rect(640+col*8.75,104,7,91,'#dd775666');text(`沿第 ${col+1} 列的 5 行求和 → 一个时间步`,720,281,11,C.coral,'center');}
  }
 }
-const renderers={overview:drawOverview,conv:drawConv,stride:drawStride,features:drawFeatures,heads:drawHeads,classify:drawClassify,box:drawBox,training:drawTraining,postprocess:drawPostprocess,recognition:drawRecognition,hardware:drawHardware};
+const renderers={overview:drawOverview,conv:drawConv,stride:drawStride,features:drawFeatures,heads:drawHeads,predictions:()=>drawPredictions(state,{ctx,text,rect,line,arrow,circle,write}),classify:drawClassify,box:drawBox,training:drawTraining,postprocess:drawPostprocess,recognition:drawRecognition,hardware:drawHardware};
 function draw(){ctx.clearRect(0,0,900,510);renderers[state.topic]();animateDetail();$('#progress').value=state.progress;write('progress-label',Math.round(state.progress)+'%');write('frame-label',`${Math.round(state.progress).toString().padStart(3,'0')} / 100`);}
 $$('.topic-bar [data-topic], .next-question [data-topic]').forEach(el=>el.onclick=()=>selectTopic(el.dataset.topic));
 $$('.sample').forEach(el=>el.onclick=()=>{state.sample=+el.dataset.sample;state.gx=state.sample===1?42:30;state.gy=20;$$('.sample').forEach(b=>b.classList.toggle('active',b===el));buildNetwork();buildControls();draw();});
@@ -161,7 +167,7 @@ canvas.addEventListener('click',pointGrid);
 canvas.addEventListener('keydown',e=>{if(!['box','features'].includes(state.topic)||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();state.gx=Math.max(0,Math.min(79,state.gx+(e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0)));state.gy=Math.max(0,Math.min(44,state.gy+(e.key==='ArrowDown'?1:e.key==='ArrowUp'?-1:0)));for(const k of ['gx','gy']){$('#'+k).value=state[k];write(k+'-value',state[k]);}draw();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){state.playing=false;$('#play').textContent='▶ 播放';$('#play').setAttribute('aria-pressed','false');}});
 function tick(t){const dt=lastTime?Math.min(100,t-lastTime):0;lastTime=t;if(state.playing){state.progress=Math.min(100,state.progress+dt/180*state.speed);if(state.topic==='training'){state.train=state.progress;$('#train').value=state.train;write('train-value',Math.round(state.train));}draw();if(state.progress>=100){state.playing=false;$('#play').textContent='▶ 重播';$('#play').setAttribute('aria-pressed','false');}}requestAnimationFrame(tick);}
-const explorer=createNetworkExplorer({getSample:()=>state.sample,onSelectLayer:(id,ch)=>{state.layer=id;state.channel=ch;selectTopic(id===7?'box':id===10?'classify':id>=4?'heads':'conv');},drawInput:el=>scene(el.getContext('2d'),0,0,el.width,el.height)});
+const explorer=createNetworkExplorer({getSample:()=>state.sample,onSelectLayer:(id,ch)=>{state.layer=id;state.channel=ch;selectTopic(id===7?'predictions':id===10?'classify':id>=4?'heads':'conv');},onOpenPredictions:()=>{selectTopic('predictions');$('#experiment').scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'start'});},drawInput:el=>scene(el.getContext('2d'),0,0,el.width,el.height)});
 buildNetwork();selectTopic(topicKeys.includes(location.hash.slice(1))?location.hash.slice(1):'overview');
 if(reducedMotion)$('#play').title='已遵循减少动态效果偏好，默认暂停；点击可主动播放';
 requestAnimationFrame(tick);

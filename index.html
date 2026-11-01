@@ -7,6 +7,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%23db705c'/%3E%3Ctext x='20' y='28' text-anchor='middle' fill='white' font-size='26'%3EC%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="explorer.css">
+  <link rel="stylesheet" href="predictions.css">
 </head>
 <body>
   <header class="site-header"><a class="brand" href="./"><span class="brand-mark">▦</span> CNN <b>EXPLAINER</b><span class="brand-sub">/ FPGA 车牌检测</span></a><nav><a href="#reading">原理解释</a><a href="https://github.com/seek685/Soc_riscv32_demo">GitHub ↗</a></nav></header>
@@ -19,12 +20,13 @@
       <div class="network-caption"><span>尺寸 = 宽 × 高 × 通道</span><span>卷积块：卷积 → 偏置 → 量化 / ReLU（末端两头无 ReLU）</span><span>检测网络没有池化和全连接</span></div>
     </section>
     <div class="topic-bar" role="navigation" aria-label="选择原理实验">
-      <button data-topic="overview" class="active">全程概览</button><button data-topic="conv">卷积与激活</button><button data-topic="stride">步长与池化</button><button data-topic="features">特征与位置</button><button data-topic="heads">L4 后的分叉</button><button data-topic="classify">分类分数</button><button data-topic="box">框的坐标</button><button data-topic="training">距离怎么学会</button><button data-topic="postprocess">框去重与裁剪</button><button data-topic="recognition">识别字符</button><button data-topic="hardware">窗口与流水</button>
+      <button data-topic="overview" class="active">全程概览</button><button data-topic="conv">卷积与激活</button><button data-topic="stride">步长与池化</button><button data-topic="features">特征与位置</button><button data-topic="heads">L4 后的分叉</button><button data-topic="predictions">32 通道到候选框</button><button data-topic="classify">分类分数</button><button data-topic="box">框的坐标</button><button data-topic="training">距离怎么学会</button><button data-topic="postprocess">框去重与裁剪</button><button data-topic="recognition">识别字符</button><button data-topic="hardware">窗口与流水</button>
     </div>
     <section class="experiment" id="experiment" aria-labelledby="experiment-title">
       <div class="experiment-heading"><div><p class="eyebrow" id="experiment-kicker"></p><h2 id="experiment-title"></h2></div><div class="playback"><button id="reset" title="重置本实验">↺ 重置</button><button id="step" title="前进一步">单步 ▷</button><button id="play" class="primary" aria-pressed="false">▶ 播放</button><select id="speed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div></div>
       <p id="experiment-lead" class="experiment-lead"></p>
       <div class="lab"><div class="visual-panel"><div class="visual-label"><span id="visual-name"></span><span id="frame-label"></span></div><canvas id="visual" width="900" height="510" tabindex="0" aria-label="交互计算图，框坐标实验中可以点击网格或用方向键选择位置"></canvas><p id="visual-caption"></p></div><aside id="controls" class="controls" aria-label="实验参数"></aside></div>
+      <details id="prediction-products" hidden><summary>展开全部 32 个通道：同一个特征怎样参与 L、T、R、B 四次求和？</summary><div class="product-table-scroll"><table><thead><tr><th scope="col">输入通道</th><th scope="col">特征值</th><th scope="col">对 L 的贡献</th><th scope="col">对 T 的贡献</th><th scope="col">对 R 的贡献</th><th scope="col">对 B 的贡献</th></tr></thead><tbody id="prediction-products-body"></tbody><tfoot id="prediction-products-foot"></tfoot></table></div></details>
       <div class="progress-line"><input id="progress" aria-label="动画进度" type="range" min="0" max="100" value="0"><span id="progress-label">0%</span></div>
       <div class="insight"><span>这一步要理解</span><p id="takeaway"></p></div>
     </section>
