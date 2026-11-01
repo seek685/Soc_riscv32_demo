@@ -1,9 +1,10 @@
-import { chromium } from 'playwright';
+﻿import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { serve } from './serve.mjs';
+import { checkExplorer } from './explorer-browser-checks.mjs';
 const server = await serve();
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {});
 await mkdir('test-artifacts', { recursive: true });
 const errors = [];
 let checks = 0;
@@ -17,10 +18,12 @@ try {
   await page.waitForSelector('#controls .control-heading');
   assert.equal(await page.locator('.node').count(), 12); checks++;
   await page.screenshot({ path: 'test-artifacts/desktop-overview.png', fullPage: true });
+  checks += await checkExplorer(page);
   const topics = await page.locator('.topic-bar button').evaluateAll(nodes => nodes.map(n => n.dataset.topic));
   for (const topic of topics) {
     await page.locator(`.topic-bar [data-topic="${topic}"]`).click();
     assert.equal(await page.locator('#explanations article').count(), 4);
+    if(topic==='overview'){assert.equal(await page.locator('#play').isVisible(),false);assert.equal(await page.locator('#signal').count(),0);checks+=2;continue;}
     const before = await page.locator('#visual').evaluate(el => el.toDataURL());
     await slider(page, 'progress', 75);
     const after = await page.locator('#visual').evaluate(el => el.toDataURL());
@@ -68,8 +71,9 @@ try {
   await page.locator('.sample[data-sample="1"]').click();
   await page.locator('.topic-bar [data-topic="box"]').click();
   assert.equal(await page.locator('#gx').inputValue(), '42'); checks++;
-  await page.locator('[data-node="10"]').click();
+  await page.locator('[data-node="10"] .layer-label').click();
   assert.equal(await page.locator('.topic-bar .active').getAttribute('data-topic'), 'classify'); checks++;
+  await page.locator('#return-network').click();
   await page.setViewportSize({ width: 390, height: 844 });
   for (const topic of topics) {
     await page.locator(`.topic-bar [data-topic="${topic}"]`).click();

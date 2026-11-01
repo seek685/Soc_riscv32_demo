@@ -6,14 +6,16 @@
   <title>CNN Explainer · 从像素到位置</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%23db705c'/%3E%3Ctext x='20' y='28' text-anchor='middle' fill='white' font-size='26'%3EC%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="explorer.css">
 </head>
 <body>
   <header class="site-header"><a class="brand" href="./"><span class="brand-mark">▦</span> CNN <b>EXPLAINER</b><span class="brand-sub">/ FPGA 车牌检测</span></a><nav><a href="#reading">原理解释</a><a href="https://github.com/seek685/Soc_riscv32_demo">GitHub ↗</a></nav></header>
   <main>
     <section class="intro"><div><p class="eyebrow">SEE THE NETWORK. UNDERSTAND THE BOX.</p><h1>一张图，怎样变成<span>一个框？</span></h1><p>跟着特征流动，拆开每一次计算。点击下方任意一层，看看它把什么变成了什么。</p></div><div class="intro-note"><span class="status-dot"></span> 按你的工程结构重建<small>结构、尺寸与解码规则来自 RTL<br>图像、热力图及可调头值为教学示例</small></div></section>
     <section class="network-section" aria-label="可交互网络总览">
-      <div class="section-top"><div class="sample-choices" aria-label="选择教学图像"><span>输入示例</span><button class="sample active" data-sample="0">居中车牌</button><button class="sample" data-sample="1">向右移动</button><button class="sample" data-sample="2">低对比度</button></div><div class="legend"><i class="blue"></i> 较低响应 <i class="red"></i> 较高响应 <span>点击特征图展开 ↓</span></div></div>
-      <div class="network-scroll"><div id="network" class="network"><svg id="connections" aria-hidden="true" viewBox="0 0 1380 380"></svg><div id="network-nodes"></div><div class="branch-label box-label">定位 · 到四条边有多远？</div><div class="branch-label class-label">分类 · 这里像哪一类？</div></div></div>
+      <div class="section-top"><div class="sample-choices" aria-label="选择教学图像"><span>输入示例</span><button class="sample active" data-sample="0">居中车牌</button><button class="sample" data-sample="1">向右移动</button><button class="sample" data-sample="2">低对比度</button></div><div class="legend"><i class="blue"></i> 较低响应 <i class="red"></i> 较高响应 <span>悬停点亮连线 · 点击放大</span></div></div>
+      <div id="network-overview" class="network-scroll"><div id="network" class="network"><svg id="connections" aria-hidden="true" viewBox="0 0 1380 380"></svg><div id="network-nodes"></div><div class="branch-label box-label">定位 · 到四条边有多远？</div><div class="branch-label class-label">分类 · 这里像哪一类？</div></div></div>
+      <div id="layer-expanded" hidden></div>
       <div class="network-caption"><span>尺寸 = 宽 × 高 × 通道</span><span>卷积块：卷积 → 偏置 → 量化 / ReLU（末端两头无 ReLU）</span><span>检测网络没有池化和全连接</span></div>
     </section>
     <div class="topic-bar" role="navigation" aria-label="选择原理实验">
